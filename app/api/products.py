@@ -1,5 +1,6 @@
 """
-POST   /api/products/upload      — ingest file, generate TikTok payload, save to JSON db
+POST   /api/products/upload      — ingest file, process in background, save to DB immediately
+GET    /api/products/jobs         — list background job statuses
 GET    /api/products/             — list all saved products
 GET    /api/products/{id}         — get single product
 PATCH  /api/products/{id}         — edit a product record
@@ -7,10 +8,11 @@ POST   /api/products/push         — push selected products to TikTok
 PATCH  /api/products/bulk-price   — apply price formula to selected/all products
 """
 import asyncio
+import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 
 from app.core.config import settings
 from app.models.product import (
@@ -34,6 +36,9 @@ from app.services.gemini_service import generate_product_payload
 from app.services.tiktok_service import push_product_to_tiktok
 
 router = APIRouter(prefix="/api/products", tags=["products"])
+
+# In-memory job tracker: job_id -> {status, total, done, errors}
+_jobs: Dict[str, dict] = {}
 
 
 def _record_to_response(r: ProductRecord) -> ProductResponse:
@@ -60,20 +65,27 @@ def _record_to_response(r: ProductRecord) -> ProductResponse:
     )
 
 
-# ── Upload (preview only — does NOT save to DB) ────────────────────────────
+# ── Upload: fire-and-forget, saves directly to DB in background ────────────
 
-@router.post("/upload", response_model=List[ProductResponse])
+@router.post("/upload")
 async def upload_products(
+    background_tasks: BackgroundTasks,
     upload_type: UploadType = Form(...),
     file: UploadFile = File(...),
+    use_ai: bool = Form(False),
     text: Optional[str] = Form(None),
+    cost_price: Optional[str] = Form(None),
     selling_price: Optional[str] = Form(None),
+    dim_length: Optional[str] = Form(None),
+    dim_width: Optional[str] = Form(None),
+    dim_height: Optional[str] = Form(None),
     source_city: Optional[str] = Form(None),
     factory_name: Optional[str] = Form(None),
 ):
     """
-    Extracts pages, calls Gemini, and returns preview records.
-    Nothing is written to the database until POST /confirm is called.
+    Reads and validates the file synchronously, then dispatches processing to a
+    background task so the client can submit the next upload immediately.
+    Returns {job_id, queued} right away — no waiting for Gemini.
     """
     file_bytes = await file.read()
     filename = file.filename or "upload"
@@ -86,7 +98,6 @@ async def upload_products(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Single upload only accepts image files, got: {ext}",
             )
-
     if upload_type == UploadType.multiple:
         allowed = {".pdf", ".pptx", ".ppt"}
         if ext not in allowed:
@@ -95,95 +106,126 @@ async def upload_products(
                 detail=f"Multiple upload requires a PDF or PPTX file, got: {ext}",
             )
 
+    # Build manual dims dict only when fields were actually filled
+    manual_dims = None
+    if dim_length or dim_width or dim_height:
+        manual_dims = {
+            "length": dim_length or "0",
+            "width": dim_width or "0",
+            "height": dim_height or "0",
+            "unit": "CENTIMETER",
+        }
+
     Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
     (Path(settings.uploads_dir) / filename).write_bytes(file_bytes)
 
+    job_id = str(uuid.uuid4())[:8]
+    _jobs[job_id] = {"status": "queued", "total": 0, "done": 0, "errors": []}
+
+    background_tasks.add_task(
+        _process_upload,
+        job_id, file_bytes, filename, upload_type, use_ai,
+        text, cost_price, selling_price, manual_dims,
+        source_city, factory_name,
+    )
+
+    return {"job_id": job_id, "status": "queued"}
+
+
+async def _process_upload(
+    job_id: str,
+    file_bytes: bytes,
+    filename: str,
+    upload_type: UploadType,
+    use_ai: bool,
+    text: Optional[str],
+    cost_price: Optional[str],
+    selling_price: Optional[str],
+    manual_dims: Optional[dict],
+    source_city: Optional[str],
+    factory_name: Optional[str],
+):
+    from app.services.extractor import image_to_bytes
+
     loop = asyncio.get_event_loop()
-    pages = await loop.run_in_executor(None, extract_pages, file_bytes, filename)
+    job = _jobs[job_id]
+    job["status"] = "processing"
+
+    try:
+        pages = await loop.run_in_executor(None, extract_pages, file_bytes, filename)
+    except Exception as exc:
+        job["status"] = "error"
+        job["errors"].append(str(exc))
+        return
 
     if not pages:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not extract any pages/images from the uploaded file.",
-        )
+        job["status"] = "error"
+        job["errors"].append("Could not extract any pages from the file.")
+        return
 
-    async def process_page(page_data):
-        # Gemini receives the full page image — it can see all text labels
-        payload, sp, cp, sku_code = await loop.run_in_executor(
-            None,
-            generate_product_payload,
-            page_data.page_image,
-            page_data.extracted_text,
-            text or "",
-            selling_price,
-        )
+    job["total"] = len(pages)
 
-        # Save the YOLO-cropped thumbnail to disk for the UI
-        from app.services.extractor import image_to_bytes
+    async def process_one(page_data):
         img_filename = f"{filename}_page{page_data.page_index}.jpg"
         img_path = Path(settings.images_dir) / img_filename
-        img_bytes = await loop.run_in_executor(
-            None, image_to_bytes, page_data.image, "JPEG"
-        )
-        img_path.write_bytes(img_bytes)
+        try:
+            img_bytes = await loop.run_in_executor(
+                None, image_to_bytes, page_data.image, "JPEG"
+            )
+            img_path.write_bytes(img_bytes)
 
-        record = ProductRecord(
-            source_file=filename,
-            source_page=page_data.page_index,
-            upload_type=upload_type,
-            source_city=source_city,
-            factory_name=factory_name,
-            cost_price=cp,
-            selling_price=sp,
-            sku_code=sku_code,
-            extracted_text=page_data.extracted_text,
-            additional_text=text,
-            tiktok_payload=payload,
-            image_path=str(img_path),
-        )
-        return record
+            if use_ai:
+                payload, sp, cp, sku_code = await loop.run_in_executor(
+                    None,
+                    generate_product_payload,
+                    page_data.page_image,
+                    page_data.extracted_text,
+                    text or "",
+                    selling_price,
+                )
+                # Only override with manual values if user actually filled them
+                if manual_dims:
+                    payload.package_dimensions = manual_dims
+                if cost_price:
+                    cp = cost_price
+                if selling_price:
+                    sp = selling_price
+            else:
+                payload = TikTokProductPayload(title="", description="")
+                payload.package_dimensions = manual_dims
+                sp = selling_price
+                cp = cost_price
+                sku_code = None
 
-    records = await asyncio.gather(*[process_page(p) for p in pages])
-    return [_record_to_response(r) for r in records]
+            record = ProductRecord(
+                source_file=filename,
+                source_page=page_data.page_index,
+                upload_type=upload_type,
+                source_city=source_city,
+                factory_name=factory_name,
+                cost_price=cp,
+                selling_price=sp,
+                sku_code=sku_code,
+                extracted_text=page_data.extracted_text,
+                additional_text=text,
+                tiktok_payload=payload,
+                image_path=str(img_path),
+            )
+            await db.save_product(record)
+            job["done"] += 1
+        except Exception as exc:
+            job["errors"].append(f"page {page_data.page_index}: {exc}")
+            job["done"] += 1
+
+    await asyncio.gather(*[process_one(p) for p in pages])
+    job["status"] = "done" if not job["errors"] else "partial"
 
 
-# ── Confirm: save previewed products to DB ─────────────────────────────────
+# ── Job status ─────────────────────────────────────────────────────────────
 
-@router.post("/confirm", response_model=List[ProductResponse])
-async def confirm_products(products: List[ProductResponse]):
-    """
-    Receive the (possibly user-edited) preview records and persist them to the JSON DB.
-    The UI sends back the full list after the user reviews/edits the Gemini output.
-    """
-    saved = []
-    for p in products:
-        # Reconstruct a full ProductRecord from the response shape
-        existing = await db.get_product(p.product_source_id)
-        if existing:
-            # Already saved (e.g. double-confirm) — just update
-            record = existing
-        else:
-            record = ProductRecord(product_source_id=p.product_source_id)
-
-        payload = p.tiktok_payload
-        record.tiktok_payload = payload
-        record.cost_price = p.cost_price
-        record.selling_price = p.selling_price
-        record.source_city = p.source_city
-        record.factory_name = p.factory_name
-        record.tiktok_listing_id = p.tiktok_listing_id
-        record.sku_code = p.sku_code
-        record.source_file = p.source_file
-        record.source_page = p.source_page
-        # Re-derive image_path from the served URL if present
-        if p.image_url:
-            img_name = Path(p.image_url).name
-            record.image_path = str(Path(settings.images_dir) / img_name)
-
-        await db.save_product(record)
-        saved.append(record)
-
-    return [_record_to_response(r) for r in saved]
+@router.get("/jobs")
+async def list_jobs():
+    return _jobs
 
 
 # ── List / Get ─────────────────────────────────────────────────────────────

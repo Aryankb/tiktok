@@ -36,7 +36,7 @@ export const TIKTOK_LISTING_IDS = [
 ]
 
 export const api = {
-  // Returns preview records — NOT saved to DB yet
+  // Upload file — returns {job_id, status} immediately; processing happens in background
   uploadProducts: (formData) =>
     fetch(BASE + '/upload', { method: 'POST', body: formData, headers: EXTRA_HEADERS }).then(async (res) => {
       if (!res.ok) {
@@ -46,13 +46,7 @@ export const api = {
       return res.json()
     }),
 
-  // Save confirmed (possibly edited) previews to DB
-  confirmProducts: (products) =>
-    request('/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(products),
-    }),
+  getJobs: () => request('/jobs'),
 
   listProducts: () => request('/'),
 
