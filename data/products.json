@@ -2,6 +2,7 @@
   "d872dbfc-92aa-4292-b13a-7a1bd1b649ac": {
     "product_source_id": "d872dbfc-92aa-4292-b13a-7a1bd1b649ac",
     "created_at": "2026-07-27T02:10:56.717984",
+    "updated_at": "2026-07-28T07:04:25.227644",
     "source_file": "Screenshot 2026-07-27 024059.png",
     "source_page": 0,
     "upload_type": "single",
@@ -43,6 +44,546 @@
         "height": "17",
         "unit": "CENTIMETER"
       }
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "bfe9f5cb-01ac-4ea4-aed5-62bf99265455": {
+    "product_source_id": "bfe9f5cb-01ac-4ea4-aed5-62bf99265455",
+    "created_at": "2026-07-28T06:46:56.803596",
+    "updated_at": "2026-07-28T06:46:56.803596",
+    "source_file": "17852210448087259803003488998032.jpg",
+    "source_page": 0,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Abc",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": "20",
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\17852210448087259803003488998032.jpg_page0.jpg",
+    "tiktok_payload": {
+      "title": "Clear Glass Drinking Tumbler",
+      "description": "<p>Elevate your daily hydration with this elegant, clear glass tumbler. Featuring a minimalist design and a solid base, this versatile glass is perfect for water, iced tea, juice, or your favorite cocktails. Durable, crystal-clear, and easy to clean, it is an essential addition to any kitchen or dining collection.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "20",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "d72c9cc6-85b4-469d-8d10-c701b21b8b45": {
+    "product_source_id": "d72c9cc6-85b4-469d-8d10-c701b21b8b45",
+    "created_at": "2026-07-28T06:54:01.532155",
+    "updated_at": "2026-07-28T06:54:01.533811",
+    "source_file": "17852215797005910020501199585765.jpg",
+    "source_page": 0,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": "20",
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\17852215797005910020501199585765.jpg_page0.jpg",
+    "tiktok_payload": {
+      "title": "Vintage TAI Desktop Office Landline Telephone",
+      "description": "<p>Upgrade your office aesthetic with this classic vintage TAI landline telephone. Features a sturdy build, clear numeric keypad, and dedicated function buttons including Redial, Conference, Speaker, and Hold. Perfect for those who appreciate retro office technology or need a reliable secondary communication device.</p>",
+      "category_id": "",
+      "brand_id": "TAI",
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "20",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "ca4ae926-b1d1-4c96-8864-099597aeb2ce": {
+    "product_source_id": "ca4ae926-b1d1-4c96-8864-099597aeb2ce",
+    "created_at": "2026-07-28T07:02:47.320949",
+    "updated_at": "2026-07-28T07:02:47.320949",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 0,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page0.jpg",
+    "tiktok_payload": {
+      "title": "Handcrafted Wooden Leaf-Shaped Serving Boards - Set of 4",
+      "description": "<p>Add a touch of nature to your table with this beautiful set of 4 handcrafted wooden serving boards. Designed in an elegant leaf shape with a natural wood grain finish, these serving platters are perfect for appetizers, charcuterie, or as unique decorative pieces for your kitchen and dining area.</p><p>Features:<ul><li>Set of 4 leaf-shaped boards</li><li>High-quality natural wood construction</li><li>Elegant and rustic design</li><li>Ideal for entertaining or home decor</li></ul></p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "e359d63d-391b-48d5-95bb-dbe2a3d66877": {
+    "product_source_id": "e359d63d-391b-48d5-95bb-dbe2a3d66877",
+    "created_at": "2026-07-28T07:02:47.373506",
+    "updated_at": "2026-07-28T07:02:47.373506",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 1,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page1.jpg",
+    "tiktok_payload": {
+      "title": "Handcrafted Wooden Serving Board Set",
+      "description": "<p>Elevate your dining experience with this set of 4 artisanal wooden serving boards. Crafted from high-quality, rich-grained wood, these boards feature a unique fan shape with a convenient circular handle, making them perfect for serving appetizers, cheeses, or charcuterie. Durable, elegant, and stylish, these boards add a rustic charm to any kitchen or dining table.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "ccd32e8d-cb49-444f-a14a-2c5c5d5e3d71": {
+    "product_source_id": "ccd32e8d-cb49-444f-a14a-2c5c5d5e3d71",
+    "created_at": "2026-07-28T07:02:47.411859",
+    "updated_at": "2026-07-28T07:02:47.411859",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 2,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page2.jpg",
+    "tiktok_payload": {
+      "title": "Set of 4 Handcrafted Wooden Serving and Cutting Boards",
+      "description": "<p>Elevate your kitchen and dining experience with this set of 4 premium handcrafted wooden boards. Featuring rich natural wood grain patterns and a convenient hanging loop design, these versatile boards are perfect for serving cheese, charcuterie, appetizers, or as stylish prep surfaces. Durable, elegant, and eco-friendly, they make a beautiful addition to any modern or rustic home.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "2908cc51-fb5b-4804-8974-4a7607fb3631": {
+    "product_source_id": "2908cc51-fb5b-4804-8974-4a7607fb3631",
+    "created_at": "2026-07-28T07:02:47.445917",
+    "updated_at": "2026-07-28T07:02:47.445917",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 3,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page3.jpg",
+    "tiktok_payload": {
+      "title": "Set of 4 Organic Shaped Wooden Serving Boards",
+      "description": "<p>Elevate your table setting with this beautiful set of 4 artisanal wooden serving boards. Featuring a unique, organic shape and a convenient cutout handle, these boards are perfect for serving appetizers, cheeses, or charcuterie. Crafted from high-quality wood, these boards bring a natural, rustic elegance to any dining experience.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "56e70188-2c80-4bc7-aaa6-dde09732a202": {
+    "product_source_id": "56e70188-2c80-4bc7-aaa6-dde09732a202",
+    "created_at": "2026-07-28T07:02:47.480966",
+    "updated_at": "2026-07-28T07:02:47.480966",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 4,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page4.jpg",
+    "tiktok_payload": {
+      "title": "Handcrafted Round Wooden Serving Board with Handle",
+      "description": "<p>Elevate your food presentation with these beautifully handcrafted round wooden serving boards. Perfect for serving charcuterie, cheese, appetizers, or as a rustic pizza board. Made from high-quality, durable wood with a natural finish, each piece brings warmth and elegance to your kitchen and dining table. Features a sturdy handle for easy serving and carrying.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "1d49e3a4-857f-4fe7-b81b-18ca1f0b878e": {
+    "product_source_id": "1d49e3a4-857f-4fe7-b81b-18ca1f0b878e",
+    "created_at": "2026-07-28T07:02:47.501020",
+    "updated_at": "2026-07-28T07:02:47.501020",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 5,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page5.jpg",
+    "tiktok_payload": {
+      "title": "Set of 4 Round Wooden Serving Boards with Handles",
+      "description": "<p>Elevate your kitchen and dining experience with this set of 4 artisanal round wooden serving boards. Crafted from high-quality natural wood, these boards feature a beautiful dark grain finish and convenient handles for easy carrying. Perfect for serving charcuterie, cheeses, appetizers, or as stylish pizza paddles for your next gathering.</p><p>Features: <br><ul><li>Set of 4 serving boards</li><li>Durable, food-safe wood construction</li><li>Ergonomic handle design</li><li>Rustic, elegant look perfect for home hosting</li></ul></p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "0ad2537c-523d-4968-87c8-80103aa0e59a": {
+    "product_source_id": "0ad2537c-523d-4968-87c8-80103aa0e59a",
+    "created_at": "2026-07-28T07:02:47.548108",
+    "updated_at": "2026-07-28T07:02:47.548108",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 6,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page6.jpg",
+    "tiktok_payload": {
+      "title": "Handcrafted Wooden Serving Board with Handle",
+      "description": "<p>Elevate your kitchen and dining experience with these beautiful, handcrafted wooden serving boards. Perfect for charcuterie, appetizers, or as a decorative serving piece, each board features a unique natural grain pattern and a convenient circular handle for easy carrying and hanging storage. Durable, stylish, and essential for any host.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "f9900b60-e802-4027-b5fe-9c3c01efd4b6": {
+    "product_source_id": "f9900b60-e802-4027-b5fe-9c3c01efd4b6",
+    "created_at": "2026-07-28T07:02:47.596538",
+    "updated_at": "2026-07-28T07:02:47.596538",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 7,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page7.jpg",
+    "tiktok_payload": {
+      "title": "Set of 4 Handcrafted Wooden Serving Boards",
+      "description": "<p>Elevate your dining experience with this set of 4 artisanal wooden serving boards. Crafted from high-quality natural wood, these boards feature a beautiful grain pattern and a unique ergonomic handle design. Perfect for serving appetizers, charcuterie, or as rustic kitchen decor.</p><p>Features:</p><ul><li>Includes 4 matching wooden boards</li><li>Durable and sustainable natural wood construction</li><li>Easy to hang with integrated handle holes</li><li>Perfect for hosting and entertaining</li></ul>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "61020a62-628a-4ea9-aab0-bd00ac827fa8": {
+    "product_source_id": "61020a62-628a-4ea9-aab0-bd00ac827fa8",
+    "created_at": "2026-07-28T07:02:47.646678",
+    "updated_at": "2026-07-28T07:02:47.646678",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 8,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page8.jpg",
+    "tiktok_payload": {
+      "title": "Set of 4 Wooden Serving Trays with Ergonomic Handle",
+      "description": "<p>Elevate your dining experience with this elegant set of 4 wooden serving trays. Crafted with a unique, modern kidney-bean shape, these trays feature a convenient built-in handle for easy carrying. Perfect for serving appetizers, snacks, or drinks, these natural wood boards add a rustic and sophisticated touch to any kitchen or dining table. Durable, stylish, and versatile.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  },
+  "9787a4e8-fdbc-4320-913a-f9c4b1040c89": {
+    "product_source_id": "9787a4e8-fdbc-4320-913a-f9c4b1040c89",
+    "created_at": "2026-07-28T07:02:47.682355",
+    "updated_at": "2026-07-28T07:02:47.682355",
+    "source_file": "DOC-20260728-WA0004..pdf",
+    "source_page": 9,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": null,
+    "selling_price": null,
+    "sku_code": null,
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\DOC-20260728-WA0004..pdf_page9.jpg",
+    "tiktok_payload": {
+      "title": "Set of 4 Wooden Serving Boards with Handle",
+      "description": "<p>Elevate your dining experience with this elegant set of four wooden serving boards. Handcrafted from high-quality, rich-grained wood, these boards feature a unique oval design with a convenient circular handle, making them perfect for serving appetizers, charcuterie, cheeses, or desserts. Their rustic yet sophisticated look makes them a great addition to any kitchen or a beautiful housewarming gift.</p>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "0.00",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 0
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": null
     },
     "push_status": "pending",
     "tiktok_product_id": null,
