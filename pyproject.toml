@@ -1,0 +1,23 @@
+[project]
+name = "tiktok"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiofiles>=23.2.1",
+    "fastapi>=0.111.0",
+    "google-generativeai>=0.7.0",
+    "httpx>=0.27.0",
+    "paddleocr>=2.7.3",
+    "paddlepaddle>=2.6.1",
+    "pillow>=10.3.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "pymupdf>=1.24.0",
+    "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.9",
+    "python-pptx>=0.6.23",
+    "ultralytics>=8.2.0",
+    "uvicorn[standard]>=0.30.0",
+]

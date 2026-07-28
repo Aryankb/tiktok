@@ -1,0 +1,51 @@
+{
+  "d872dbfc-92aa-4292-b13a-7a1bd1b649ac": {
+    "product_source_id": "d872dbfc-92aa-4292-b13a-7a1bd1b649ac",
+    "created_at": "2026-07-27T02:10:56.717984",
+    "source_file": "Screenshot 2026-07-27 024059.png",
+    "source_page": 0,
+    "upload_type": "single",
+    "source_city": "Delhi",
+    "factory_name": "Bharti and Company",
+    "tiktok_listing_id": null,
+    "cost_price": "08.90",
+    "selling_price": "11.57",
+    "sku_code": "BAC-146",
+    "extracted_text": null,
+    "additional_text": null,
+    "image_path": "data\\images\\Screenshot 2026-07-27 024059.png_page0.jpg",
+    "tiktok_payload": {
+      "title": "Handcrafted Round Wooden and Iron Wall Hanger",
+      "description": "<p>Add a touch of rustic charm to your home with this beautifully handcrafted wooden and iron wall hanger. Featuring a detailed mandala-style carved wood block and a sturdy iron hook, this piece is perfect for hanging coats, hats, keys, or decorative items. Its unique artisan design makes it a stylish addition to any entryway, bedroom, or living space.</p><ul><li>Material: Solid wood and durable iron</li><li>Style: Rustic, Artisan, Decorative</li><li>Mounting: Wall-mounted</li></ul>",
+      "category_id": "",
+      "brand_id": null,
+      "images": [],
+      "skus": [
+        {
+          "seller_sku": null,
+          "original_price": {
+            "amount": "11.57",
+            "currency": "USD"
+          },
+          "stock_infos": [
+            {
+              "warehouse_id": "",
+              "available_stock": 100
+            }
+          ],
+          "sales_attributes": []
+        }
+      ],
+      "package_weight": null,
+      "package_dimensions": {
+        "length": "7",
+        "width": "3",
+        "height": "17",
+        "unit": "CENTIMETER"
+      }
+    },
+    "push_status": "pending",
+    "tiktok_product_id": null,
+    "push_error": null
+  }
+}
