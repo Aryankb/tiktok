@@ -1,8 +1,20 @@
-const BASE = '/api/products'
-const CATEGORIES_BASE = '/api/categories'
+export const API_HOST = import.meta.env.VITE_API_URL ?? ''
+const BASE = `${API_HOST}/api/products`
+const CATEGORIES_BASE = `${API_HOST}/api/categories`
+
+export function staticUrl(path) {
+  if (!path) return null
+  if (path.startsWith('http')) return path
+  return `${API_HOST}${path}`
+}
+
+const EXTRA_HEADERS = API_HOST.includes('ngrok') ? { 'ngrok-skip-browser-warning': '1' } : {}
 
 async function request(path, options = {}) {
-  const res = await fetch(BASE + path, options)
+  const res = await fetch(BASE + path, {
+    ...options,
+    headers: { ...EXTRA_HEADERS, ...(options.headers ?? {}) },
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || res.statusText)
@@ -26,7 +38,7 @@ export const TIKTOK_LISTING_IDS = [
 export const api = {
   // Returns preview records — NOT saved to DB yet
   uploadProducts: (formData) =>
-    fetch(BASE + '/upload', { method: 'POST', body: formData }).then(async (res) => {
+    fetch(BASE + '/upload', { method: 'POST', body: formData, headers: EXTRA_HEADERS }).then(async (res) => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(err.detail || res.statusText)
@@ -77,7 +89,7 @@ export const api = {
 }
 
 export const categoryApi = {
-  list: () => fetch(CATEGORIES_BASE + '/').then(async (res) => {
+  list: () => fetch(CATEGORIES_BASE + '/', { headers: EXTRA_HEADERS }).then(async (res) => {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }))
       throw new Error(err.detail || res.statusText)

@@ -3,7 +3,7 @@ import {
   RefreshCw, Send, Pencil, Loader2, CheckCircle, XCircle,
   Clock, AlertCircle, Search, ChevronDown, ChevronRight, ImageOff, Trash2, ArrowUpDown,
 } from 'lucide-react'
-import { api, TIKTOK_LISTING_IDS } from '../api.js'
+import { api, TIKTOK_LISTING_IDS, staticUrl } from '../api.js'
 import EditProductModal from '../components/EditProductModal.jsx'
 import FormulaBar from '../components/FormulaBar.jsx'
 
@@ -71,8 +71,8 @@ function ExpandedRow({ product }) {
       <td colSpan={11} className="px-6 py-4">
         <div className="flex gap-5">
           {/* Large image */}
-          {product.image_url
-            ? <img src={product.image_url} alt="" className="w-28 h-28 rounded-xl object-cover border border-white/10 shrink-0" />
+          {staticUrl(product.image_url)
+            ? <img src={staticUrl(product.image_url)} alt="" className="w-28 h-28 rounded-xl object-cover border border-white/10 shrink-0" />
             : <div className="w-28 h-28 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
                 <ImageOff size={22} className="text-gray-700" />
               </div>
@@ -444,8 +444,8 @@ export default function ProductsPage() {
 
                     {/* Image thumbnail */}
                     <td className="px-2 py-2">
-                      {p.image_url
-                        ? <img src={p.image_url} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10" />
+                      {staticUrl(p.image_url)
+                        ? <img src={staticUrl(p.image_url)} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10" />
                         : <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-white/5">
                             <ImageOff size={14} className="text-gray-700" />
                           </div>

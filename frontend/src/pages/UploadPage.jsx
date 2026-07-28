@@ -4,7 +4,7 @@ import {
   AlertCircle, Loader2, Save, ChevronDown, ChevronUp, Info,
   ImageOff,
 } from 'lucide-react'
-import { api, TIKTOK_LISTING_IDS } from '../api.js'
+import { api, TIKTOK_LISTING_IDS, staticUrl } from '../api.js'
 import CategorySelect from '../components/CategorySelect.jsx'
 import { useNavigate } from 'react-router-dom'
 
@@ -58,8 +58,8 @@ function ReviewCard({ product, index, onChange, total }) {
         className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 text-left hover:bg-white/[0.07] transition-colors"
       >
         {/* Thumbnail */}
-        {product.image_url
-          ? <img src={product.image_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-white/10" />
+        {staticUrl(product.image_url)
+          ? <img src={staticUrl(product.image_url)} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-white/10" />
           : <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
               <ImageOff size={18} className="text-gray-600" />
             </div>
@@ -98,9 +98,9 @@ function ReviewCard({ product, index, onChange, total }) {
           <div className="flex gap-4">
             {/* Larger image */}
             <div className="shrink-0">
-              {product.image_url
+              {staticUrl(product.image_url)
                 ? <img
-                    src={product.image_url}
+                    src={staticUrl(product.image_url)}
                     alt="product"
                     className="w-28 h-28 sm:w-36 sm:h-36 rounded-xl object-cover border border-white/10"
                   />
