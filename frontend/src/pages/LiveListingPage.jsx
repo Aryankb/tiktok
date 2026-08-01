@@ -157,10 +157,13 @@ function ListingWorkspace({ listing, onBack }) {
   const [extracting, setExtracting] = useState(false)
   const [formError, setFormError] = useState(null)
 
-  // Voice
-  const [listening, setListening] = useState(false)
-  const recognitionRef = useRef(null)
+  // Voice recording (MediaRecorder → backend transcribe)
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
   const fileRef = useRef(null)
+  const cameraRef = useRef(null)
 
   const currentTitle = buildTitle(prefix, nextSeq, {
     length: dims.length || '?',
@@ -192,22 +195,49 @@ function ListingWorkspace({ listing, onBack }) {
   useEffect(() => { loadSkus(true) }, [loadSkus])
 
   // Voice ──────────────────────────────────────────────────────────────────
-  function toggleVoice() {
-    if (listening) { recognitionRef.current?.stop(); setListening(false); return }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { alert('Speech recognition not supported. Use Chrome.'); return }
-    const rec = new SR()
-    rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = false
-    rec.onresult = e => {
-      let newText = ''
-      for (let i = e.resultIndex; i < e.results.length; i++)
-        if (e.results[i].isFinal) newText += e.results[i][0].transcript + ' '
-      if (newText.trim())
-        setVoiceText(prev => prev ? prev.trimEnd() + ' ' + newText.trim() : newText.trim())
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioChunksRef.current = []
+      const mr = new MediaRecorder(stream)
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || 'audio/webm' })
+        await sendAudioToBackend(blob, mr.mimeType)
+      }
+      mr.start()
+      mediaRecorderRef.current = mr
+      setRecording(true)
+    } catch (e) {
+      setFormError('Microphone access denied: ' + e.message)
     }
-    rec.onerror = () => setListening(false)
-    rec.onend = () => setListening(false)
-    recognitionRef.current = rec; rec.start(); setListening(true)
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setRecording(false)
+    setTranscribing(true)
+  }
+
+  async function sendAudioToBackend(blob, mimeType) {
+    setFormError(null)
+    try {
+      const fd = new FormData()
+      const ext = mimeType?.includes('ogg') ? 'ogg' : mimeType?.includes('mp4') ? 'mp4' : 'webm'
+      fd.append('audio', blob, `recording.${ext}`)
+      if (imageFile) fd.append('image', imageFile)
+      const data = await apiPost('/transcribe', fd)
+      if (data.transcript) setVoiceText(data.transcript)
+      if (data.product_name) setProductName(data.product_name)
+      if (data.dimensions) setDims({ length: data.dimensions.length || '', width: data.dimensions.width || '', height: data.dimensions.height || '' })
+      if (data.price) setPrice(data.price)
+      if (data.stock != null) setStock(String(data.stock))
+    } catch (e) {
+      setFormError('Transcription failed: ' + e.message)
+    } finally {
+      setTranscribing(false)
+    }
   }
 
   function handleImageChange(e) {
@@ -223,7 +253,8 @@ function ListingWorkspace({ listing, onBack }) {
     setExtracting(true); setFormError(null)
     try {
       const fd = new FormData()
-      fd.append('image', imageFile); fd.append('voice_text', voiceText)
+      fd.append('image', imageFile)
+      if (voiceText) fd.append('voice_text', voiceText)
       const data = await apiPost('/extract', fd)
       if (data.product_name) setProductName(data.product_name)
       if (data.dimensions) setDims({ length: data.dimensions.length || '', width: data.dimensions.width || '', height: data.dimensions.height || '' })
@@ -403,23 +434,45 @@ function ListingWorkspace({ listing, onBack }) {
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Product Input — {prefix}{nextSeq}</p>
 
         <div className="flex gap-3">
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="relative w-28 h-28 flex-shrink-0 rounded-lg border-2 border-dashed border-white/15 hover:border-pink-500/50 flex items-center justify-center overflow-hidden transition-colors"
-          >
-            {imagePreview
-              ? <img src={imagePreview} className="w-full h-full object-cover" alt="" />
-              : <div className="flex flex-col items-center gap-1 text-gray-600"><ImageIcon size={22} /><span className="text-xs">Upload</span></div>}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+          {/* Image — tap opens gallery+camera picker on mobile */}
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="relative w-28 h-28 rounded-lg border-2 border-dashed border-white/15 hover:border-pink-500/50 flex items-center justify-center overflow-hidden transition-colors"
+            >
+              {imagePreview
+                ? <img src={imagePreview} className="w-full h-full object-cover" alt="" />
+                : <div className="flex flex-col items-center gap-1 text-gray-600"><ImageIcon size={22} /><span className="text-xs">Photo</span></div>}
+            </button>
+            {/* Two hidden inputs: gallery (default) and camera */}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
+            <button
+              onClick={() => cameraRef.current?.click()}
+              className="text-xs text-gray-500 hover:text-white text-center transition-colors"
+            >
+              📷 Camera
+            </button>
+          </div>
 
           <div className="flex-1 flex flex-col gap-2">
-            <button
-              onClick={toggleVoice}
-              className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg transition-colors w-fit ${listening ? 'bg-red-600 text-white animate-pulse' : 'bg-[#111] border border-white/10 text-gray-300 hover:text-white'}`}
-            >
-              {listening ? <><MicOff size={14} /> Stop</> : <><Mic size={14} /> Speak notes</>}
-            </button>
+            {/* Record button */}
+            {!transcribing ? (
+              <button
+                onClick={recording ? stopRecording : startRecording}
+                className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg transition-colors w-fit ${
+                  recording ? 'bg-red-600 text-white animate-pulse' : 'bg-[#111] border border-white/10 text-gray-300 hover:text-white'
+                }`}
+              >
+                {recording ? <><MicOff size={14} /> Stop & transcribe</> : <><Mic size={14} /> Record voice</>}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-gray-400 px-3 py-2 bg-[#111] border border-white/10 rounded-lg w-fit">
+                <Loader2 size={13} className="animate-spin" /> Transcribing…
+              </div>
+            )}
+
+            {/* Transcript display / edit */}
             {voiceText && (
               <div className="relative">
                 <textarea value={voiceText} onChange={e => setVoiceText(e.target.value)} rows={2}
@@ -427,10 +480,12 @@ function ListingWorkspace({ listing, onBack }) {
                 <button onClick={() => setVoiceText('')} className="absolute top-1.5 right-2 text-gray-600 hover:text-gray-400 text-xs">✕</button>
               </div>
             )}
+
+            {/* Manual AI extract (image only, no audio) */}
             <button onClick={handleExtract} disabled={extracting || !imageFile}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white rounded-lg transition-colors w-fit">
               {extracting ? <Loader2 size={12} className="animate-spin" /> : <Pencil size={12} />}
-              {extracting ? 'Extracting…' : 'Auto-fill with AI'}
+              {extracting ? 'Extracting…' : 'AI fill (image only)'}
             </button>
           </div>
         </div>
