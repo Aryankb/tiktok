@@ -1,6 +1,7 @@
 export const API_HOST = import.meta.env.VITE_API_URL ?? ''
 const BASE = `${API_HOST}/api/products`
 const CATEGORIES_BASE = `${API_HOST}/api/categories`
+const ORDERS_BASE = `${API_HOST}/api/orders`
 
 export function staticUrl(path) {
   if (!path) return null
@@ -90,4 +91,42 @@ export const categoryApi = {
     }
     return res.json()
   }),
+}
+
+async function ordersRequest(path, options = {}) {
+  const res = await fetch(ORDERS_BASE + path, {
+    ...options,
+    headers: { ...EXTRA_HEADERS, ...(options.headers ?? {}) },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || res.statusText)
+  }
+  return res.json()
+}
+
+export const ordersApi = {
+  sync: (body) =>
+    ordersRequest('/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  list: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null))
+    ).toString()
+    return ordersRequest(qs ? `?${qs}` : '')
+  },
+
+  listings: () => ordersRequest('/listings'),
+
+  exportUrl: (listingId, dateFrom, dateTo, productName) => {
+    const qs = new URLSearchParams()
+    if (dateFrom) qs.set('date_from', dateFrom)
+    if (dateTo) qs.set('date_to', dateTo)
+    if (productName) qs.set('product_name', productName)
+    return `${ORDERS_BASE}/export/${encodeURIComponent(listingId)}${qs.toString() ? '?' + qs.toString() : ''}`
+  },
 }

@@ -1,7 +1,9 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { Upload, LayoutList } from 'lucide-react'
+import { Upload, LayoutList, ShoppingCart, Tv2 } from 'lucide-react'
 import UploadPage from './pages/UploadPage.jsx'
 import ProductsPage from './pages/ProductsPage.jsx'
+import OrdersPage from './pages/OrdersPage.jsx'
+import LiveListingPage from './pages/LiveListingPage.jsx'
 
 export default function App() {
   return (
@@ -30,6 +32,26 @@ export default function App() {
         >
           <LayoutList size={15} /> Products
         </NavLink>
+        <NavLink
+          to="/orders"
+          className={({ isActive }) =>
+            `flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+              isActive ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'
+            }`
+          }
+        >
+          <ShoppingCart size={15} /> Orders
+        </NavLink>
+        <NavLink
+          to="/live-listing"
+          className={({ isActive }) =>
+            `flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+              isActive ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'
+            }`
+          }
+        >
+          <Tv2 size={15} /> Live Listing
+        </NavLink>
       </nav>
 
       {/* Page content */}
@@ -37,6 +59,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<UploadPage />} />
           <Route path="/products" element={<ProductsPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/live-listing" element={<LiveListingPage />} />
         </Routes>
       </main>
     </div>
