@@ -37,9 +37,9 @@ function compressToSquare(file, maxPx = 1200, quality = 0.82) {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function buildTitle(prefix, seq, dims, unit, name) {
+function buildTitle(prefix, seq, dims, unit, name, includeDims) {
   const id = `${prefix}${seq}`
-  const dimStr = dims ? `${dims.length}x${dims.width}x${dims.height}` : ''
+  const dimStr = includeDims && dims ? `${dims.length}x${dims.width}x${dims.height}` : ''
   const parts = [id, dimStr ? `${dimStr}-${unit}` : '', name].filter(Boolean)
   return parts.join('-')
 }
@@ -195,6 +195,7 @@ function ListingWorkspace({ listing, onBack }) {
   const [imagePreview, setImagePreview] = useState(null)
   const [productName, setProductName] = useState('')
   const [dims, setDims] = useState({ length: '', width: '', height: '' })
+  const [includeDims, setIncludeDims] = useState(false)
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('')
   const [voiceText, setVoiceText] = useState('')
@@ -212,7 +213,7 @@ function ListingWorkspace({ listing, onBack }) {
     length: dims.length || '?',
     width: dims.width || '?',
     height: dims.height || '?',
-  }, unit, productName || 'Product')
+  }, unit, productName || 'Product', includeDims)
 
   // Persist drafts whenever they change
   useEffect(() => {
@@ -317,7 +318,7 @@ function ListingWorkspace({ listing, onBack }) {
       id: `${prefix}${nextSeq}`,
       title: currentTitle,
       imageFile, imagePreview, productName,
-      dims: { ...dims }, unit, price, stock,
+      dims: { ...dims }, unit, includeDims, price, stock,
       status: statusOverride,
       error: null,
       result: null,
@@ -328,6 +329,7 @@ function ListingWorkspace({ listing, onBack }) {
     setNextSeq(n => n + 1)
     setImageFile(null); setImagePreview(null)
     setProductName(''); setDims({ length: '', width: '', height: '' })
+    setIncludeDims(false)
     setPrice(''); setStock(''); setVoiceText('')
     setFormError(null)
     if (fileRef.current) fileRef.current.value = ''
@@ -630,11 +632,27 @@ function ListingWorkspace({ listing, onBack }) {
         </div>
 
         <FieldInput label="Product Name" value={productName} onChange={setProductName} placeholder="e.g. Wooden Serving Bowl" />
-        <div className="grid grid-cols-3 gap-3">
-          <FieldInput label="Length" value={dims.length} onChange={v => setDims(d => ({ ...d, length: v }))} placeholder="10" />
-          <FieldInput label="Width" value={dims.width} onChange={v => setDims(d => ({ ...d, width: v }))} placeholder="5" />
-          <FieldInput label="Height" value={dims.height} onChange={v => setDims(d => ({ ...d, height: v }))} placeholder="3" />
-        </div>
+
+        {/* Dimension toggle */}
+        <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+          <div
+            onClick={() => setIncludeDims(v => !v)}
+            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+              includeDims ? 'bg-pink-500 border-pink-500' : 'border-white/20 bg-transparent'
+            }`}
+          >
+            {includeDims && <span className="text-white text-xs font-bold leading-none">✓</span>}
+          </div>
+          <span className="text-xs text-gray-400">Include dimensions in title</span>
+        </label>
+
+        {includeDims && (
+          <div className="grid grid-cols-3 gap-3">
+            <FieldInput label="Length" value={dims.length} onChange={v => setDims(d => ({ ...d, length: v }))} placeholder="10" />
+            <FieldInput label="Width" value={dims.width} onChange={v => setDims(d => ({ ...d, width: v }))} placeholder="5" />
+            <FieldInput label="Height" value={dims.height} onChange={v => setDims(d => ({ ...d, height: v }))} placeholder="3" />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <FieldInput label="Price (SGD)" value={price} onChange={setPrice} placeholder="12.90" />
           <FieldInput label="Stock (qty)" value={stock} onChange={setStock} placeholder="50" type="number" />
