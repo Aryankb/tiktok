@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Mic, MicOff, Loader2, CheckCircle, XCircle, ChevronLeft,
-  Image as ImageIcon, Pencil, Plus, RefreshCw, Trash2, Send,
+  Image as ImageIcon, Pencil, Plus, RefreshCw, Trash2, Send, BookmarkPlus,
 } from 'lucide-react'
 import { API_HOST } from '../api.js'
 
@@ -48,10 +48,22 @@ async function apiPostJson(path, body) {
   return data
 }
 
-// Parse prefix+number from a variation title like "A1 : (30x30x1.5) Chopping Board" or seller_sku "A3"
 function parseId(str) {
   const m = str?.match(/^([A-Za-z]+)(\d+)/)
   return m ? { prefix: m[1].toUpperCase(), seq: parseInt(m[2], 10) } : null
+}
+
+// ── draft localStorage helpers ─────────────────────────────────────────────
+
+function draftsKey(listingId) { return `drafts_${listingId}` }
+
+function loadDrafts(listingId) {
+  try { return JSON.parse(localStorage.getItem(draftsKey(listingId)) || '[]') }
+  catch { return [] }
+}
+
+function saveDrafts(listingId, drafts) {
+  localStorage.setItem(draftsKey(listingId), JSON.stringify(drafts))
 }
 
 // ── sub-components ─────────────────────────────────────────────────────────
@@ -76,7 +88,7 @@ function FieldInput({ label, value, onChange, placeholder, type = 'text' }) {
 export default function LiveListingPage() {
   const [listings, setListings] = useState([])
   const [loadingListings, setLoadingListings] = useState(true)
-  const [selected, setSelected] = useState(null)   // chosen listing card
+  const [selected, setSelected] = useState(null)
 
   useEffect(() => {
     apiGet('/listings').then(setListings).finally(() => setLoadingListings(false))
@@ -99,25 +111,29 @@ export default function LiveListingPage() {
           <p className="text-sm text-gray-500 text-center py-16">No listings found. Sync orders first.</p>
         ) : (
           <div className="space-y-2">
-            {listings.map(l => (
-              <button
-                key={l.listing_id}
-                onClick={() => setSelected(l)}
-                className="w-full text-left flex items-center justify-between bg-[#1a1a1a] border border-white/8 hover:border-pink-500/50 rounded-lg px-4 py-3 transition-colors group"
-              >
-                <div className="min-w-0">
-                  <p className="text-xs font-mono text-cyan-400">{l.listing_id}</p>
-                  {l.product_name && <p className="text-sm text-white font-medium mt-0.5 truncate">{l.product_name}</p>}
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {l.sku_count} variations
-                    {l.status && <span className="ml-2 capitalize">{l.status.toLowerCase()}</span>}
-                  </p>
-                </div>
-                <span className="text-xs text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
-                  Select →
-                </span>
-              </button>
-            ))}
+            {listings.map(l => {
+              const draftCount = loadDrafts(l.listing_id).length
+              return (
+                <button
+                  key={l.listing_id}
+                  onClick={() => setSelected(l)}
+                  className="w-full text-left flex items-center justify-between bg-[#1a1a1a] border border-white/8 hover:border-pink-500/50 rounded-lg px-4 py-3 transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono text-cyan-400">{l.listing_id}</p>
+                    {l.product_name && <p className="text-sm text-white font-medium mt-0.5 truncate">{l.product_name}</p>}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {l.sku_count} variations
+                      {l.status && <span className="ml-2 capitalize">{l.status.toLowerCase()}</span>}
+                      {draftCount > 0 && <span className="ml-2 text-amber-400">{draftCount} draft{draftCount > 1 ? 's' : ''}</span>}
+                    </p>
+                  </div>
+                  <span className="text-xs text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
+                    Select →
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -132,21 +148,24 @@ export default function LiveListingPage() {
 // ── workspace ──────────────────────────────────────────────────────────────
 
 function ListingWorkspace({ listing, onBack }) {
-  // Prefix / sequence state
   const [prefix, setPrefix] = useState('A')
   const [nextSeq, setNextSeq] = useState(1)
   const [unit, setUnit] = useState('cm')
 
-  // Existing SKUs from TikTok
   const [existingSkus, setExistingSkus] = useState([])
   const [loadingSkus, setLoadingSkus] = useState(true)
   const [skusError, setSkusError] = useState(null)
 
-  // Batch queue — array of {id, imageFile, imagePreview, productName, dims, price, stock, status, error}
+  // Queue — live items to push now
   const [queue, setQueue] = useState([])
   const [submitting, setSubmitting] = useState(false)
 
-  // Current form (staged before adding to queue)
+  // Drafts — persisted in localStorage, imageFile is null on reload (only preview stored)
+  const [drafts, setDrafts] = useState(() => loadDrafts(listing.listing_id))
+  const [selectedDraftIds, setSelectedDraftIds] = useState(new Set())
+  const [pushingDrafts, setPushingDrafts] = useState(false)
+
+  // Current form
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [productName, setProductName] = useState('')
@@ -157,7 +176,6 @@ function ListingWorkspace({ listing, onBack }) {
   const [extracting, setExtracting] = useState(false)
   const [formError, setFormError] = useState(null)
 
-  // Voice recording (MediaRecorder → backend transcribe)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const mediaRecorderRef = useRef(null)
@@ -171,7 +189,11 @@ function ListingWorkspace({ listing, onBack }) {
     height: dims.height || '?',
   }, unit, productName || 'Product')
 
-  // Load / reload SKUs ──────────────────────────────────────────────────────
+  // Persist drafts whenever they change
+  useEffect(() => {
+    saveDrafts(listing.listing_id, drafts)
+  }, [drafts, listing.listing_id])
+
   const loadSkus = useCallback((updateSeq = false) => {
     setLoadingSkus(true)
     setSkusError(null)
@@ -264,38 +286,135 @@ function ListingWorkspace({ listing, onBack }) {
     finally { setExtracting(false) }
   }
 
-  // Add current form to queue ───────────────────────────────────────────────
-  function handleAddToQueue() {
-    if (!imageFile) { setFormError('Image required.'); return }
-    if (!productName) { setFormError('Product name required.'); return }
-    if (!price) { setFormError('Price required.'); return }
-    if (!stock) { setFormError('Stock required.'); return }
-
-    const item = {
+  function buildQueueItem(statusOverride = 'queued') {
+    return {
       id: `${prefix}${nextSeq}`,
       title: currentTitle,
       imageFile, imagePreview, productName,
       dims: { ...dims }, unit, price, stock,
-      status: 'queued', // queued | uploading | done | error
+      status: statusOverride,
       error: null,
       result: null,
     }
-    setQueue(q => [...q, item])
-    // Advance seq and clear form
+  }
+
+  function clearForm() {
     setNextSeq(n => n + 1)
     setImageFile(null); setImagePreview(null)
     setProductName(''); setDims({ length: '', width: '', height: '' })
     setPrice(''); setStock(''); setVoiceText('')
     setFormError(null)
-    // reset file input
     if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+  }
+
+  function handleAddToQueue() {
+    if (!imageFile) { setFormError('Image required.'); return }
+    if (!productName) { setFormError('Product name required.'); return }
+    if (!price) { setFormError('Price required.'); return }
+    if (!stock) { setFormError('Stock required.'); return }
+    setQueue(q => [...q, buildQueueItem('queued')])
+    clearForm()
+  }
+
+  // Save draft — store imagePreview as data URL so it survives page reload
+  async function handleSaveDraft() {
+    if (!imageFile) { setFormError('Image required.'); return }
+    if (!productName) { setFormError('Product name required.'); return }
+    if (!price) { setFormError('Price required.'); return }
+    if (!stock) { setFormError('Stock required.'); return }
+
+    // Convert imageFile to base64 data URL for persistence
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = e => resolve(e.target.result)
+      reader.readAsDataURL(imageFile)
+    })
+
+    const draft = {
+      draftId: `${listing.listing_id}_${Date.now()}`,
+      id: `${prefix}${nextSeq}`,
+      title: currentTitle,
+      imageDataUrl: dataUrl,  // persisted
+      productName,
+      dims: { ...dims }, unit, price, stock,
+      savedAt: new Date().toISOString(),
+    }
+    setDrafts(d => [...d, draft])
+    clearForm()
+  }
+
+  function removeDraft(draftId) {
+    setDrafts(d => d.filter(x => x.draftId !== draftId))
+    setSelectedDraftIds(s => { const n = new Set(s); n.delete(draftId); return n })
+  }
+
+  function toggleDraftSelect(draftId) {
+    setSelectedDraftIds(s => {
+      const n = new Set(s)
+      n.has(draftId) ? n.delete(draftId) : n.add(draftId)
+      return n
+    })
+  }
+
+  function toggleSelectAll() {
+    const pushable = drafts.filter(d => d.status !== 'done')
+    if (selectedDraftIds.size === pushable.length) {
+      setSelectedDraftIds(new Set())
+    } else {
+      setSelectedDraftIds(new Set(pushable.map(d => d.draftId)))
+    }
+  }
+
+  // Push selected drafts to TikTok
+  async function handlePushDrafts() {
+    const toPush = drafts.filter(d => selectedDraftIds.has(d.draftId) && d.status !== 'done')
+    if (toPush.length === 0) return
+    setPushingDrafts(true)
+
+    for (const draft of toPush) {
+      // Mark as uploading
+      setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'uploading', error: null } : x))
+
+      try {
+        // Convert data URL back to File for upload
+        const res = await fetch(draft.imageDataUrl)
+        const blob = await res.blob()
+        const file = new File([blob], 'product.jpg', { type: blob.type || 'image/jpeg' })
+
+        const imgFd = new FormData()
+        imgFd.append('image', file)
+        const { uri } = await apiPost('/upload-image', imgFd)
+
+        const result = await apiPostJson('/add-sku', {
+          listing_id: listing.listing_id,
+          title: draft.title,
+          image_uri: uri,
+          price: draft.price,
+          stock: parseInt(draft.stock, 10),
+          seller_sku: draft.id,
+        })
+
+        if (result.success) {
+          setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'done' } : x))
+          // Remove from selection
+          setSelectedDraftIds(s => { const n = new Set(s); n.delete(draft.draftId); return n })
+        } else {
+          setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'error', error: result.error } : x))
+        }
+      } catch (e) {
+        setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'error', error: e.message } : x))
+      }
+    }
+
+    setPushingDrafts(false)
+    apiGet(`/skus/${listing.listing_id}`).then(data => setExistingSkus(data.skus || [])).catch(() => {})
   }
 
   function removeFromQueue(idx) {
     setQueue(q => q.filter((_, i) => i !== idx))
   }
 
-  // Submit all queued items to TikTok ──────────────────────────────────────
   async function handleSubmitQueue() {
     if (queue.length === 0) return
     setSubmitting(true)
@@ -304,7 +423,6 @@ function ListingWorkspace({ listing, onBack }) {
       const item = queue[i]
       if (item.status === 'done') continue
 
-      // mark uploading
       setQueue(q => q.map((x, idx) => idx === i ? { ...x, status: 'uploading', error: null } : x))
 
       try {
@@ -332,12 +450,12 @@ function ListingWorkspace({ listing, onBack }) {
     }
 
     setSubmitting(false)
-    // Refresh already-listed panel (don't reset seq — user manages it)
     apiGet(`/skus/${listing.listing_id}`).then(data => setExistingSkus(data.skus || [])).catch(() => {})
   }
 
   const canAddToQueue = !!imageFile && !!productName && !!price && !!stock
   const pendingCount = queue.filter(x => x.status === 'queued' || x.status === 'error').length
+  const pushableDraftCount = drafts.filter(d => selectedDraftIds.has(d.draftId) && d.status !== 'done').length
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -434,7 +552,6 @@ function ListingWorkspace({ listing, onBack }) {
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Product Input — {prefix}{nextSeq}</p>
 
         <div className="flex gap-3">
-          {/* Image — tap opens gallery+camera picker on mobile */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <button
               onClick={() => fileRef.current?.click()}
@@ -444,7 +561,6 @@ function ListingWorkspace({ listing, onBack }) {
                 ? <img src={imagePreview} className="w-full h-full object-cover" alt="" />
                 : <div className="flex flex-col items-center gap-1 text-gray-600"><ImageIcon size={22} /><span className="text-xs">Photo</span></div>}
             </button>
-            {/* Two hidden inputs: gallery (default) and camera */}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
             <button
@@ -456,7 +572,6 @@ function ListingWorkspace({ listing, onBack }) {
           </div>
 
           <div className="flex-1 flex flex-col gap-2">
-            {/* Record button */}
             {!transcribing ? (
               <button
                 onClick={recording ? stopRecording : startRecording}
@@ -472,7 +587,6 @@ function ListingWorkspace({ listing, onBack }) {
               </div>
             )}
 
-            {/* Transcript display / edit */}
             {voiceText && (
               <div className="relative">
                 <textarea value={voiceText} onChange={e => setVoiceText(e.target.value)} rows={2}
@@ -481,7 +595,6 @@ function ListingWorkspace({ listing, onBack }) {
               </div>
             )}
 
-            {/* Manual AI extract (image only, no audio) */}
             <button onClick={handleExtract} disabled={extracting || !imageFile}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white rounded-lg transition-colors w-fit">
               {extracting ? <Loader2 size={12} className="animate-spin" /> : <Pencil size={12} />}
@@ -507,13 +620,23 @@ function ListingWorkspace({ listing, onBack }) {
           </div>
         )}
 
-        <button
-          onClick={handleAddToQueue}
-          disabled={!canAddToQueue}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-white/10 hover:border-pink-500/50 disabled:opacity-40 text-white rounded-lg transition-colors text-sm"
-        >
-          <Plus size={15} /> Add {prefix}{nextSeq} to queue
-        </button>
+        {/* Two action buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleSaveDraft}
+            disabled={!canAddToQueue}
+            className="flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-amber-400/30 hover:border-amber-400/60 disabled:opacity-40 text-amber-400 rounded-lg transition-colors text-sm"
+          >
+            <BookmarkPlus size={15} /> Save draft
+          </button>
+          <button
+            onClick={handleAddToQueue}
+            disabled={!canAddToQueue}
+            className="flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-white/10 hover:border-pink-500/50 disabled:opacity-40 text-white rounded-lg transition-colors text-sm"
+          >
+            <Plus size={15} /> Add to queue
+          </button>
+        </div>
       </div>
 
       {/* Queue */}
@@ -552,13 +675,90 @@ function ListingWorkspace({ listing, onBack }) {
                   <span className="text-xs text-gray-500">${item.price}</span>
                   {item.status === 'done' && <CheckCircle size={14} className="text-emerald-400" />}
                   {item.status === 'uploading' && <Loader2 size={14} className="animate-spin text-blue-400" />}
-                  {item.status === 'queued' && !submitting && (
+                  {(item.status === 'queued' || item.status === 'error') && !submitting && (
                     <button onClick={() => removeFromQueue(idx)} className="text-gray-600 hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
                   )}
-                  {item.status === 'error' && !submitting && (
-                    <button onClick={() => removeFromQueue(idx)} className="text-red-500 hover:text-red-300 transition-colors">
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Drafts panel */}
+      {drafts.length > 0 && (
+        <div className="bg-[#1a1a1a] border border-amber-400/20 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-amber-400 font-medium uppercase tracking-wide">Drafts ({drafts.length})</p>
+              {drafts.some(d => d.status !== 'done') && (
+                <button
+                  onClick={toggleSelectAll}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  {selectedDraftIds.size === drafts.filter(d => d.status !== 'done').length ? 'Deselect all' : 'Select all'}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {!pushingDrafts && pushableDraftCount > 0 && (
+                <button
+                  onClick={handlePushDrafts}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-medium rounded-lg transition-colors"
+                >
+                  <Send size={12} /> Push {pushableDraftCount}
+                </button>
+              )}
+              {pushingDrafts && (
+                <span className="text-xs text-amber-400 flex items-center gap-1">
+                  <Loader2 size={11} className="animate-spin" /> Pushing…
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {drafts.map(draft => (
+              <div
+                key={draft.draftId}
+                onClick={() => draft.status !== 'done' && toggleDraftSelect(draft.draftId)}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 border cursor-pointer transition-colors ${
+                  draft.status === 'done' ? 'bg-emerald-500/5 border-emerald-500/20 cursor-default'
+                  : draft.status === 'error' ? 'bg-red-500/5 border-red-500/20'
+                  : draft.status === 'uploading' ? 'bg-blue-500/5 border-blue-500/20 cursor-default'
+                  : selectedDraftIds.has(draft.draftId)
+                    ? 'bg-amber-500/10 border-amber-400/40'
+                    : 'bg-[#111] border-white/5 hover:border-amber-400/20'
+                }`}
+              >
+                {/* Checkbox */}
+                {draft.status !== 'done' && draft.status !== 'uploading' && (
+                  <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                    selectedDraftIds.has(draft.draftId) ? 'bg-amber-400 border-amber-400' : 'border-white/20'
+                  }`}>
+                    {selectedDraftIds.has(draft.draftId) && <span className="text-black text-xs font-bold">✓</span>}
+                  </div>
+                )}
+                {draft.imageDataUrl
+                  ? <img src={draft.imageDataUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+                  : <div className="w-10 h-10 rounded bg-white/5 flex-shrink-0" />}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-mono text-amber-400">{draft.id}</p>
+                  <p className="text-xs text-gray-400 truncate">{draft.productName}</p>
+                  {draft.error && <p className="text-xs text-red-400 mt-0.5 truncate">{draft.error}</p>}
+                  {!draft.status && <p className="text-xs text-gray-600">{new Date(draft.savedAt).toLocaleTimeString()}</p>}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-gray-500">${draft.price}</span>
+                  {draft.status === 'done' && <CheckCircle size={14} className="text-emerald-400" />}
+                  {draft.status === 'uploading' && <Loader2 size={14} className="animate-spin text-blue-400" />}
+                  {draft.status !== 'uploading' && (
+                    <button
+                      onClick={e => { e.stopPropagation(); removeDraft(draft.draftId) }}
+                      className="text-gray-600 hover:text-red-400 transition-colors"
+                    >
                       <Trash2 size={14} />
                     </button>
                   )}
