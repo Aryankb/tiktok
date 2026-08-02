@@ -10,6 +10,31 @@ const EXTRA_HEADERS = API_HOST.includes('ngrok') ? { 'ngrok-skip-browser-warning
 
 const UNITS = ['cm', 'm', 'mm', 'in']
 
+// Crop to square, resize to maxPx, compress to JPEG quality 0.82
+// Returns a File ready to upload (~200-400KB for typical product shots)
+function compressToSquare(file, maxPx = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const side = Math.min(img.width, img.height)
+      const sx = (img.width - side) / 2
+      const sy = (img.height - side) / 2
+      const size = Math.min(side, maxPx)
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
+      canvas.toBlob(blob => {
+        resolve(new File([blob], 'product.jpg', { type: 'image/jpeg' }))
+      }, 'image/jpeg', quality)
+    }
+    img.src = url
+  })
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function buildTitle(prefix, seq, dims, unit, name) {
@@ -262,12 +287,13 @@ function ListingWorkspace({ listing, onBack }) {
     }
   }
 
-  function handleImageChange(e) {
+  async function handleImageChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
-    setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
     setFormError(null)
+    const compressed = await compressToSquare(file)
+    setImageFile(compressed)
+    setImagePreview(URL.createObjectURL(compressed))
   }
 
   async function handleExtract() {
