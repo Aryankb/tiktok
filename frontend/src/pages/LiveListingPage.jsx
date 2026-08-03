@@ -60,12 +60,26 @@ function loadDrafts(listingId) {
   try {
     const raw = JSON.parse(localStorage.getItem(draftsKey(listingId)) || '[]')
     if (!Array.isArray(raw)) return []
-    // Drop any draft missing required fields — corrupted entries cause blank screen
-    return raw.filter(d => d && typeof d === 'object' && d.draftId && d.id)
+    return raw
+      .filter(d => d && typeof d === 'object' && d.draftId && d.id)
+      // Reset any draft stuck in uploading state from a previous crashed session
+      .map(d => d.status === 'uploading' ? { ...d, status: undefined, statusLabel: null } : d)
   } catch { return [] }
 }
 function saveDrafts(listingId, drafts) {
-  localStorage.setItem(draftsKey(listingId), JSON.stringify(drafts))
+  // Strip large base64 images before saving — keep only drafts that still have their image
+  // If localStorage quota is exceeded, save without images (flagged as imageDataUrl: null)
+  try {
+    localStorage.setItem(draftsKey(listingId), JSON.stringify(drafts))
+  } catch (e) {
+    // Quota exceeded — try saving without base64 images as fallback
+    try {
+      const slim = drafts.map(d => ({ ...d, imageDataUrl: d.imageDataUrl ? '__stored__' : null }))
+      localStorage.setItem(draftsKey(listingId), JSON.stringify(slim))
+    } catch {
+      // If even that fails, skip persistence silently — drafts live in memory only this session
+    }
+  }
 }
 
 // Compute next seq from listed SKUs + drafts
@@ -441,6 +455,8 @@ function ListingWorkspace({ listing, onBack }) {
     // Step 1: upload all images in parallel
     const uploadResults = await Promise.all(toPush.map(async (draft) => {
       try {
+        if (!draft.imageDataUrl || draft.imageDataUrl === '__stored__')
+          throw new Error('Image was not saved (localStorage was full). Re-add this draft with a new photo.')
         const res = await fetch(draft.imageDataUrl)
         const blob = await res.blob()
         const file = new File([blob], 'product.jpg', { type: blob.type || 'image/jpeg' })
@@ -895,12 +911,10 @@ function ListingWorkspace({ listing, onBack }) {
                       <Pencil size={13} />
                     </button>
                   )}
-                  {draft.status !== 'uploading' && (
-                    <button onClick={e => { e.stopPropagation(); removeDraft(draft.draftId) }}
-                      className="text-gray-600 hover:text-red-400 transition-colors">
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                  <button onClick={e => { e.stopPropagation(); removeDraft(draft.draftId) }}
+                    className="text-gray-600 hover:text-red-400 transition-colors">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             ))}
