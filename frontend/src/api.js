@@ -122,6 +122,9 @@ export const ordersApi = {
 
   listings: () => ordersRequest('/listings'),
 
+  activity: (listingId, page = 1, pageSize = 20) =>
+    ordersRequest(`/activity/${encodeURIComponent(listingId)}?page=${page}&page_size=${pageSize}`),
+
   exportUrl: (listingId, dateFrom, dateTo, productName) => {
     const qs = new URLSearchParams()
     if (dateFrom) qs.set('date_from', dateFrom)

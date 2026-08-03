@@ -1,7 +1,5 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { Upload, LayoutList, ShoppingCart, Tv2 } from 'lucide-react'
-import UploadPage from './pages/UploadPage.jsx'
-import ProductsPage from './pages/ProductsPage.jsx'
+import { ShoppingCart, Tv2 } from 'lucide-react'
 import OrdersPage from './pages/OrdersPage.jsx'
 import LiveListingPage from './pages/LiveListingPage.jsx'
 
@@ -14,26 +12,6 @@ export default function App() {
         <NavLink
           to="/"
           end
-          className={({ isActive }) =>
-            `flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-              isActive ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'
-            }`
-          }
-        >
-          <Upload size={15} /> Upload
-        </NavLink>
-        <NavLink
-          to="/products"
-          className={({ isActive }) =>
-            `flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
-              isActive ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'
-            }`
-          }
-        >
-          <LayoutList size={15} /> Products
-        </NavLink>
-        <NavLink
-          to="/orders"
           className={({ isActive }) =>
             `flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors ${
               isActive ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'
@@ -57,8 +35,7 @@ export default function App() {
       {/* Page content */}
       <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
         <Routes>
-          <Route path="/" element={<UploadPage />} />
-          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/" element={<OrdersPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/live-listing" element={<LiveListingPage />} />
         </Routes>

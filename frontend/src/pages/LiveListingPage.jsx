@@ -10,31 +10,6 @@ const EXTRA_HEADERS = API_HOST.includes('ngrok') ? { 'ngrok-skip-browser-warning
 
 const UNITS = ['cm', 'm', 'mm', 'in']
 
-// Crop to square, resize to maxPx, compress to JPEG quality 0.82
-// Returns a File ready to upload (~200-400KB for typical product shots)
-function compressToSquare(file, maxPx = 1200, quality = 0.82) {
-  return new Promise((resolve) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      const side = Math.min(img.width, img.height)
-      const sx = (img.width - side) / 2
-      const sy = (img.height - side) / 2
-      const size = Math.min(side, maxPx)
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
-      canvas.toBlob(blob => {
-        resolve(new File([blob], 'product.jpg', { type: 'image/jpeg' }))
-      }, 'image/jpeg', quality)
-    }
-    img.src = url
-  })
-}
-
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function buildTitle(prefix, seq, dims, unit, name, includeDims) {
@@ -81,14 +56,42 @@ function parseId(str) {
 // ── draft localStorage helpers ─────────────────────────────────────────────
 
 function draftsKey(listingId) { return `drafts_${listingId}` }
-
 function loadDrafts(listingId) {
   try { return JSON.parse(localStorage.getItem(draftsKey(listingId)) || '[]') }
   catch { return [] }
 }
-
 function saveDrafts(listingId, drafts) {
   localStorage.setItem(draftsKey(listingId), JSON.stringify(drafts))
+}
+
+// Compute next seq from listed SKUs + drafts
+function computeNextSeq(skus, drafts) {
+  const fromSkus = skus.map(s => parseId(s.title) || parseId(s.seller_sku)).filter(Boolean)
+  const fromDrafts = drafts.filter(d => d.status !== 'done').map(d => parseId(d.id)).filter(Boolean)
+  const all = [...fromSkus, ...fromDrafts]
+  if (all.length === 0) return { prefix: 'A', seq: 1 }
+  const max = all.reduce((a, b) => b.seq > a.seq ? b : a)
+  return { prefix: max.prefix, seq: max.seq + 1 }
+}
+
+// Crop + compress to 1:1 JPEG
+function compressToSquare(file, maxPx = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const side = Math.min(img.width, img.height)
+      const sx = (img.width - side) / 2
+      const sy = (img.height - side) / 2
+      const size = Math.min(side, maxPx)
+      const canvas = document.createElement('canvas')
+      canvas.width = size; canvas.height = size
+      canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, size, size)
+      canvas.toBlob(blob => resolve(new File([blob], 'product.jpg', { type: 'image/jpeg' })), 'image/jpeg', quality)
+    }
+    img.src = url
+  })
 }
 
 // ── sub-components ─────────────────────────────────────────────────────────
@@ -133,11 +136,11 @@ export default function LiveListingPage() {
             <Loader2 className="animate-spin mr-2" size={18} /> Loading factories…
           </div>
         ) : listings.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-16">No listings found. Sync orders first.</p>
+          <p className="text-sm text-gray-500 text-center py-16">No listings found.</p>
         ) : (
           <div className="space-y-2">
             {listings.map(l => {
-              const draftCount = loadDrafts(l.listing_id).length
+              const draftCount = loadDrafts(l.listing_id).filter(d => d.status !== 'done').length
               return (
                 <button
                   key={l.listing_id}
@@ -148,14 +151,12 @@ export default function LiveListingPage() {
                     <p className="text-xs font-mono text-cyan-400">{l.listing_id}</p>
                     {l.product_name && <p className="text-sm text-white font-medium mt-0.5 truncate">{l.product_name}</p>}
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {l.sku_count} variations
+                      {l.sku_count} listed
                       {l.status && <span className="ml-2 capitalize">{l.status.toLowerCase()}</span>}
                       {draftCount > 0 && <span className="ml-2 text-amber-400">{draftCount} draft{draftCount > 1 ? 's' : ''}</span>}
                     </p>
                   </div>
-                  <span className="text-xs text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
-                    Select →
-                  </span>
+                  <span className="text-xs text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">Select →</span>
                 </button>
               )
             })}
@@ -165,9 +166,7 @@ export default function LiveListingPage() {
     )
   }
 
-  return (
-    <ListingWorkspace listing={selected} onBack={() => setSelected(null)} />
-  )
+  return <ListingWorkspace listing={selected} onBack={() => setSelected(null)} />
 }
 
 // ── workspace ──────────────────────────────────────────────────────────────
@@ -181,16 +180,15 @@ function ListingWorkspace({ listing, onBack }) {
   const [loadingSkus, setLoadingSkus] = useState(true)
   const [skusError, setSkusError] = useState(null)
 
-  // Queue — live items to push now
-  const [queue, setQueue] = useState([])
-  const [submitting, setSubmitting] = useState(false)
-
-  // Drafts — persisted in localStorage, imageFile is null on reload (only preview stored)
+  // Drafts — only storage, no separate queue
   const [drafts, setDrafts] = useState(() => loadDrafts(listing.listing_id))
   const [selectedDraftIds, setSelectedDraftIds] = useState(new Set())
   const [pushingDrafts, setPushingDrafts] = useState(false)
 
-  // Current form
+  // editingDraftId — when set, form is editing that draft instead of creating new
+  const [editingDraftId, setEditingDraftId] = useState(null)
+
+  // Form state
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [productName, setProductName] = useState('')
@@ -215,34 +213,43 @@ function ListingWorkspace({ listing, onBack }) {
     height: dims.height || '?',
   }, unit, productName || 'Product', includeDims)
 
-  // Persist drafts whenever they change
-  useEffect(() => {
-    saveDrafts(listing.listing_id, drafts)
-  }, [drafts, listing.listing_id])
+  // Persist drafts
+  useEffect(() => { saveDrafts(listing.listing_id, drafts) }, [drafts, listing.listing_id])
 
-  const loadSkus = useCallback((updateSeq = false) => {
+  // Recompute next seq whenever skus or drafts change
+  const recomputeSeq = useCallback((skus, currentDrafts) => {
+    const { prefix: p, seq } = computeNextSeq(skus, currentDrafts)
+    setPrefix(p)
+    setNextSeq(seq)
+  }, [])
+
+  const loadSkus = useCallback((updateSeq = false, currentDrafts) => {
     setLoadingSkus(true)
     setSkusError(null)
     apiGet(`/skus/${listing.listing_id}`)
       .then(data => {
         const skus = data.skus || []
         setExistingSkus(skus)
-        if (updateSeq) {
-          const parsed = skus.map(s => parseId(s.title) || parseId(s.seller_sku)).filter(Boolean)
-          if (parsed.length > 0) {
-            const maxEntry = parsed.reduce((a, b) => b.seq > a.seq ? b : a)
-            setPrefix(maxEntry.prefix || 'A')
-            setNextSeq(maxEntry.seq + 1)
-          }
-        }
+        if (updateSeq) recomputeSeq(skus, currentDrafts || [])
       })
       .catch(e => setSkusError(e.message))
       .finally(() => setLoadingSkus(false))
-  }, [listing.listing_id])
+  }, [listing.listing_id, recomputeSeq])
 
-  useEffect(() => { loadSkus(true) }, [loadSkus])
+  useEffect(() => {
+    const initialDrafts = loadDrafts(listing.listing_id)
+    loadSkus(true, initialDrafts)
+  }, [loadSkus, listing.listing_id])
 
-  // Voice ──────────────────────────────────────────────────────────────────
+  // When drafts change (add/remove/edit), recompute seq using latest skus
+  useEffect(() => {
+    if (existingSkus.length >= 0 && !loadingSkus) {
+      recomputeSeq(existingSkus, drafts)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drafts])
+
+  // Voice
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -257,9 +264,7 @@ function ListingWorkspace({ listing, onBack }) {
       mr.start()
       mediaRecorderRef.current = mr
       setRecording(true)
-    } catch (e) {
-      setFormError('Microphone access denied: ' + e.message)
-    }
+    } catch (e) { setFormError('Microphone access denied: ' + e.message) }
   }
 
   function stopRecording() {
@@ -281,11 +286,8 @@ function ListingWorkspace({ listing, onBack }) {
       if (data.dimensions) setDims({ length: data.dimensions.length || '', width: data.dimensions.width || '', height: data.dimensions.height || '' })
       if (data.price) setPrice(data.price)
       if (data.stock != null) setStock(String(data.stock))
-    } catch (e) {
-      setFormError('Transcription failed: ' + e.message)
-    } finally {
-      setTranscribing(false)
-    }
+    } catch (e) { setFormError('Transcription failed: ' + e.message) }
+    finally { setTranscribing(false) }
   }
 
   async function handleImageChange(e) {
@@ -313,20 +315,8 @@ function ListingWorkspace({ listing, onBack }) {
     finally { setExtracting(false) }
   }
 
-  function buildQueueItem(statusOverride = 'queued') {
-    return {
-      id: `${prefix}${nextSeq}`,
-      title: currentTitle,
-      imageFile, imagePreview, productName,
-      dims: { ...dims }, unit, includeDims, price, stock,
-      status: statusOverride,
-      error: null,
-      result: null,
-    }
-  }
-
   function clearForm() {
-    setNextSeq(n => n + 1)
+    setEditingDraftId(null)
     setImageFile(null); setImagePreview(null)
     setProductName(''); setDims({ length: '', width: '', height: '' })
     setIncludeDims(false)
@@ -336,45 +326,74 @@ function ListingWorkspace({ listing, onBack }) {
     if (cameraRef.current) cameraRef.current.value = ''
   }
 
-  function handleAddToQueue() {
-    if (!imageFile) { setFormError('Image required.'); return }
-    if (!productName) { setFormError('Product name required.'); return }
-    if (!price) { setFormError('Price required.'); return }
-    if (!stock) { setFormError('Stock required.'); return }
-    setQueue(q => [...q, buildQueueItem('queued')])
-    clearForm()
+  // Load a draft into the form for editing
+  function handleEditDraft(draft) {
+    setEditingDraftId(draft.draftId)
+    setPrefix(parseId(draft.id)?.prefix || 'A')
+    setNextSeq(parseId(draft.id)?.seq || 1)
+    setProductName(draft.productName)
+    setDims(draft.dims || { length: '', width: '', height: '' })
+    setIncludeDims(draft.includeDims || false)
+    setUnit(draft.unit || 'cm')
+    setPrice(draft.price)
+    setStock(draft.stock)
+    setVoiceText('')
+    setImageFile(null)
+    setImagePreview(draft.imageDataUrl || null)
+    setFormError(null)
+    // scroll to top of form
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Save draft — store imagePreview as data URL so it survives page reload
   async function handleSaveDraft() {
-    if (!imageFile) { setFormError('Image required.'); return }
+    if (!imagePreview) { setFormError('Image required.'); return }
     if (!productName) { setFormError('Product name required.'); return }
     if (!price) { setFormError('Price required.'); return }
     if (!stock) { setFormError('Stock required.'); return }
 
-    // Convert imageFile to base64 data URL for persistence
-    const dataUrl = await new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = e => resolve(e.target.result)
-      reader.readAsDataURL(imageFile)
-    })
-
-    const draft = {
-      draftId: `${listing.listing_id}_${Date.now()}`,
-      id: `${prefix}${nextSeq}`,
-      title: currentTitle,
-      imageDataUrl: dataUrl,  // persisted
-      productName,
-      dims: { ...dims }, unit, price, stock,
-      savedAt: new Date().toISOString(),
+    // Get data URL — use existing imageFile if present, else existing preview (editing case)
+    let dataUrl = imagePreview
+    if (imageFile) {
+      dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve(e.target.result)
+        reader.readAsDataURL(imageFile)
+      })
     }
-    setDrafts(d => [...d, draft])
+
+    const title = buildTitle(prefix, nextSeq, dims, unit, productName, includeDims)
+
+    if (editingDraftId) {
+      // Update existing draft in place
+      setDrafts(d => d.map(x => x.draftId === editingDraftId ? {
+        ...x,
+        id: `${prefix}${nextSeq}`,
+        title,
+        imageDataUrl: dataUrl,
+        productName,
+        dims: { ...dims }, unit, includeDims, price, stock,
+        status: undefined, error: undefined,
+        savedAt: new Date().toISOString(),
+      } : x))
+    } else {
+      const draft = {
+        draftId: `${listing.listing_id}_${Date.now()}`,
+        id: `${prefix}${nextSeq}`,
+        title,
+        imageDataUrl: dataUrl,
+        productName,
+        dims: { ...dims }, unit, includeDims, price, stock,
+        savedAt: new Date().toISOString(),
+      }
+      setDrafts(d => [...d, draft])
+    }
     clearForm()
   }
 
   function removeDraft(draftId) {
     setDrafts(d => d.filter(x => x.draftId !== draftId))
     setSelectedDraftIds(s => { const n = new Set(s); n.delete(draftId); return n })
+    if (editingDraftId === draftId) clearForm()
   }
 
   function toggleDraftSelect(draftId) {
@@ -386,7 +405,7 @@ function ListingWorkspace({ listing, onBack }) {
   }
 
   function toggleSelectAll() {
-    const pushable = drafts.filter(d => d.status !== 'done')
+    const pushable = drafts.filter(d => d.status !== 'done' && d.status !== 'uploading')
     if (selectedDraftIds.size === pushable.length) {
       setSelectedDraftIds(new Set())
     } else {
@@ -394,22 +413,17 @@ function ListingWorkspace({ listing, onBack }) {
     }
   }
 
-  // Push selected drafts to TikTok
   async function handlePushDrafts() {
     const toPush = drafts.filter(d => selectedDraftIds.has(d.draftId) && d.status !== 'done')
     if (toPush.length === 0) return
     setPushingDrafts(true)
 
     for (const draft of toPush) {
-      // Mark as uploading
       setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'uploading', error: null } : x))
-
       try {
-        // Convert data URL back to File for upload
         const res = await fetch(draft.imageDataUrl)
         const blob = await res.blob()
         const file = new File([blob], 'product.jpg', { type: blob.type || 'image/jpeg' })
-
         const imgFd = new FormData()
         imgFd.append('image', file)
         const { uri } = await apiPost('/upload-image', imgFd)
@@ -425,7 +439,6 @@ function ListingWorkspace({ listing, onBack }) {
 
         if (result.success) {
           setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'done' } : x))
-          // Remove from selection
           setSelectedDraftIds(s => { const n = new Set(s); n.delete(draft.draftId); return n })
         } else {
           setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'error', error: result.error } : x))
@@ -439,51 +452,9 @@ function ListingWorkspace({ listing, onBack }) {
     apiGet(`/skus/${listing.listing_id}`).then(data => setExistingSkus(data.skus || [])).catch(() => {})
   }
 
-  function removeFromQueue(idx) {
-    setQueue(q => q.filter((_, i) => i !== idx))
-  }
-
-  async function handleSubmitQueue() {
-    if (queue.length === 0) return
-    setSubmitting(true)
-
-    for (let i = 0; i < queue.length; i++) {
-      const item = queue[i]
-      if (item.status === 'done') continue
-
-      setQueue(q => q.map((x, idx) => idx === i ? { ...x, status: 'uploading', error: null } : x))
-
-      try {
-        const imgFd = new FormData()
-        imgFd.append('image', item.imageFile)
-        const { uri } = await apiPost('/upload-image', imgFd)
-
-        const res = await apiPostJson('/add-sku', {
-          listing_id: listing.listing_id,
-          title: item.title,
-          image_uri: uri,
-          price: item.price,
-          stock: parseInt(item.stock, 10),
-          seller_sku: item.id,
-        })
-
-        if (res.success) {
-          setQueue(q => q.map((x, idx) => idx === i ? { ...x, status: 'done', result: res } : x))
-        } else {
-          setQueue(q => q.map((x, idx) => idx === i ? { ...x, status: 'error', error: res.error } : x))
-        }
-      } catch (e) {
-        setQueue(q => q.map((x, idx) => idx === i ? { ...x, status: 'error', error: e.message } : x))
-      }
-    }
-
-    setSubmitting(false)
-    apiGet(`/skus/${listing.listing_id}`).then(data => setExistingSkus(data.skus || [])).catch(() => {})
-  }
-
-  const canAddToQueue = !!imageFile && !!productName && !!price && !!stock
-  const pendingCount = queue.filter(x => x.status === 'queued' || x.status === 'error').length
+  const canSave = !!imagePreview && !!productName && !!price && !!stock
   const pushableDraftCount = drafts.filter(d => selectedDraftIds.has(d.draftId) && d.status !== 'done').length
+  const isEditing = !!editingDraftId
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -498,33 +469,24 @@ function ListingWorkspace({ listing, onBack }) {
         </div>
       </div>
 
-      {/* Already Listed panel */}
+      {/* Already Listed */}
       <div className="bg-[#1a1a1a] border border-white/8 rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Already Listed ({existingSkus.length})</p>
-          <button
-            onClick={() => loadSkus(false)}
-            disabled={loadingSkus}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors disabled:opacity-40"
-          >
-            <RefreshCw size={12} className={loadingSkus ? 'animate-spin' : ''} />
-            Reload
+          <button onClick={() => loadSkus(false)} disabled={loadingSkus}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors disabled:opacity-40">
+            <RefreshCw size={12} className={loadingSkus ? 'animate-spin' : ''} /> Reload
           </button>
         </div>
         {skusError && <p className="text-xs text-red-400">Could not load: {skusError}</p>}
-        {!loadingSkus && existingSkus.length === 0 && !skusError && (
-          <p className="text-xs text-gray-600">No variations listed yet.</p>
-        )}
+        {!loadingSkus && existingSkus.length === 0 && !skusError && <p className="text-xs text-gray-600">No variations listed yet.</p>}
         {existingSkus.length > 0 && (
           <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
             {existingSkus.map(s => (
               <div key={s.sku_id} className="flex items-center gap-2 bg-[#111] rounded-lg px-3 py-2">
-                {s.image_url
-                  ? <img src={s.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                {s.image_url ? <img src={s.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                   : <div className="w-8 h-8 rounded bg-white/5 flex-shrink-0" />}
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-400 truncate">{s.title}</p>
-                </div>
+                <div className="min-w-0 flex-1"><p className="text-xs text-gray-400 truncate">{s.title}</p></div>
                 <div className="text-right flex-shrink-0">
                   {s.price && <p className="text-xs text-white">${s.price}</p>}
                   <p className="text-xs text-gray-500">qty {s.stock}</p>
@@ -541,72 +503,62 @@ function ListingWorkspace({ listing, onBack }) {
         <div className="grid grid-cols-3 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-400">Prefix</label>
-            <input
-              value={prefix}
-              onChange={e => setPrefix(e.target.value.toUpperCase())}
-              placeholder="A"
-              className="bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-mono outline-none focus:border-pink-500"
-            />
+            <input value={prefix} onChange={e => setPrefix(e.target.value.toUpperCase())} placeholder="A"
+              className="bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-mono outline-none focus:border-pink-500" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-400">Next number</label>
-            <input
-              type="number"
-              min={1}
-              value={nextSeq}
-              onChange={e => setNextSeq(parseInt(e.target.value) || 1)}
-              className="bg-[#111] border border-amber-400/30 rounded-lg px-3 py-2 text-sm font-mono text-amber-400 outline-none focus:border-amber-400"
-            />
+            <input type="number" min={1} value={nextSeq} onChange={e => setNextSeq(parseInt(e.target.value) || 1)}
+              className="bg-[#111] border border-amber-400/30 rounded-lg px-3 py-2 text-sm font-mono text-amber-400 outline-none focus:border-amber-400" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-400">Dimension unit</label>
-            <select
-              value={unit}
-              onChange={e => setUnit(e.target.value)}
-              className="bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-pink-500"
-            >
+            <select value={unit} onChange={e => setUnit(e.target.value)}
+              className="bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-pink-500">
               {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
         </div>
         <div className="bg-[#111] rounded-lg px-3 py-2">
-          <p className="text-xs text-gray-500 mb-0.5">Next title preview</p>
+          <p className="text-xs text-gray-500 mb-0.5">Title preview</p>
           <p className="text-sm font-mono text-amber-400 break-all">{currentTitle}</p>
         </div>
       </div>
 
-      {/* Product input form */}
-      <div className="bg-[#1a1a1a] border border-white/8 rounded-xl p-4 space-y-3">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Product Input — {prefix}{nextSeq}</p>
+      {/* Product form */}
+      <div className={`bg-[#1a1a1a] border rounded-xl p-4 space-y-3 ${isEditing ? 'border-amber-400/40' : 'border-white/8'}`}>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+            {isEditing ? `Editing ${drafts.find(d => d.draftId === editingDraftId)?.id || ''}` : `New — ${prefix}${nextSeq}`}
+          </p>
+          {isEditing && (
+            <button onClick={clearForm} className="text-xs text-gray-500 hover:text-white transition-colors">
+              Cancel edit
+            </button>
+          )}
+        </div>
 
         <div className="flex gap-3">
           <div className="flex flex-col gap-1.5 flex-shrink-0">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="relative w-28 h-28 rounded-lg border-2 border-dashed border-white/15 hover:border-pink-500/50 flex items-center justify-center overflow-hidden transition-colors"
-            >
+            <button onClick={() => fileRef.current?.click()}
+              className="relative w-28 h-28 rounded-lg border-2 border-dashed border-white/15 hover:border-pink-500/50 flex items-center justify-center overflow-hidden transition-colors">
               {imagePreview
                 ? <img src={imagePreview} className="w-full h-full object-cover" alt="" />
                 : <div className="flex flex-col items-center gap-1 text-gray-600"><ImageIcon size={22} /><span className="text-xs">Photo</span></div>}
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
-            <button
-              onClick={() => cameraRef.current?.click()}
-              className="text-xs text-gray-500 hover:text-white text-center transition-colors"
-            >
+            <button onClick={() => cameraRef.current?.click()} className="text-xs text-gray-500 hover:text-white text-center transition-colors">
               📷 Camera
             </button>
           </div>
 
           <div className="flex-1 flex flex-col gap-2">
             {!transcribing ? (
-              <button
-                onClick={recording ? stopRecording : startRecording}
+              <button onClick={recording ? stopRecording : startRecording}
                 className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg transition-colors w-fit ${
                   recording ? 'bg-red-600 text-white animate-pulse' : 'bg-[#111] border border-white/10 text-gray-300 hover:text-white'
-                }`}
-              >
+                }`}>
                 {recording ? <><MicOff size={14} /> Stop & transcribe</> : <><Mic size={14} /> Record voice</>}
               </button>
             ) : (
@@ -633,14 +585,11 @@ function ListingWorkspace({ listing, onBack }) {
 
         <FieldInput label="Product Name" value={productName} onChange={setProductName} placeholder="e.g. Wooden Serving Bowl" />
 
-        {/* Dimension toggle */}
         <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
-          <div
-            onClick={() => setIncludeDims(v => !v)}
+          <div onClick={() => setIncludeDims(v => !v)}
             className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
               includeDims ? 'bg-pink-500 border-pink-500' : 'border-white/20 bg-transparent'
-            }`}
-          >
+            }`}>
             {includeDims && <span className="text-white text-xs font-bold leading-none">✓</span>}
           </div>
           <span className="text-xs text-gray-400">Include dimensions in title</span>
@@ -653,6 +602,7 @@ function ListingWorkspace({ listing, onBack }) {
             <FieldInput label="Height" value={dims.height} onChange={v => setDims(d => ({ ...d, height: v }))} placeholder="3" />
           </div>
         )}
+
         <div className="grid grid-cols-2 gap-3">
           <FieldInput label="Price (SGD)" value={price} onChange={setPrice} placeholder="12.90" />
           <FieldInput label="Stock (qty)" value={stock} onChange={setStock} placeholder="50" type="number" />
@@ -664,94 +614,28 @@ function ListingWorkspace({ listing, onBack }) {
           </div>
         )}
 
-        {/* Two action buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={handleSaveDraft}
-            disabled={!canAddToQueue}
-            className="flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-amber-400/30 hover:border-amber-400/60 disabled:opacity-40 text-amber-400 rounded-lg transition-colors text-sm"
-          >
-            <BookmarkPlus size={15} /> Save draft
-          </button>
-          <button
-            onClick={handleAddToQueue}
-            disabled={!canAddToQueue}
-            className="flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-white/10 hover:border-pink-500/50 disabled:opacity-40 text-white rounded-lg transition-colors text-sm"
-          >
-            <Plus size={15} /> Add to queue
-          </button>
-        </div>
+        <button onClick={handleSaveDraft} disabled={!canSave}
+          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-amber-400/30 hover:border-amber-400/60 disabled:opacity-40 text-amber-400 rounded-lg transition-colors text-sm">
+          <BookmarkPlus size={15} /> {isEditing ? 'Update draft' : 'Save to drafts'}
+        </button>
       </div>
-
-      {/* Queue */}
-      {queue.length > 0 && (
-        <div className="bg-[#1a1a1a] border border-white/8 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Queue ({queue.length})</p>
-            {!submitting && pendingCount > 0 && (
-              <button
-                onClick={handleSubmitQueue}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg transition-colors"
-              >
-                <Send size={12} /> Submit all {pendingCount}
-              </button>
-            )}
-            {submitting && <span className="text-xs text-gray-500 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Submitting…</span>}
-          </div>
-
-          <div className="space-y-2">
-            {queue.map((item, idx) => (
-              <div key={idx} className={`flex items-center gap-3 rounded-lg px-3 py-2 border ${
-                item.status === 'done' ? 'bg-emerald-500/5 border-emerald-500/20'
-                : item.status === 'error' ? 'bg-red-500/5 border-red-500/20'
-                : item.status === 'uploading' ? 'bg-blue-500/5 border-blue-500/20'
-                : 'bg-[#111] border-white/5'
-              }`}>
-                {item.imagePreview
-                  ? <img src={item.imagePreview} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
-                  : <div className="w-10 h-10 rounded bg-white/5 flex-shrink-0" />}
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-mono text-amber-400">{item.id}</p>
-                  <p className="text-xs text-gray-400 truncate">{item.productName}</p>
-                  {item.error && <p className="text-xs text-red-400 mt-0.5 truncate">{item.error}</p>}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-gray-500">${item.price}</span>
-                  {item.status === 'done' && <CheckCircle size={14} className="text-emerald-400" />}
-                  {item.status === 'uploading' && <Loader2 size={14} className="animate-spin text-blue-400" />}
-                  {(item.status === 'queued' || item.status === 'error') && !submitting && (
-                    <button onClick={() => removeFromQueue(idx)} className="text-gray-600 hover:text-red-400 transition-colors">
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Drafts panel */}
       {drafts.length > 0 && (
         <div className="bg-[#1a1a1a] border border-amber-400/20 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <p className="text-xs text-amber-400 font-medium uppercase tracking-wide">Drafts ({drafts.length})</p>
-              {drafts.some(d => d.status !== 'done') && (
-                <button
-                  onClick={toggleSelectAll}
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  {selectedDraftIds.size === drafts.filter(d => d.status !== 'done').length ? 'Deselect all' : 'Select all'}
+              <p className="text-xs text-amber-400 font-medium uppercase tracking-wide">Drafts ({drafts.filter(d => d.status !== 'done').length})</p>
+              {drafts.some(d => d.status !== 'done' && d.status !== 'uploading') && (
+                <button onClick={toggleSelectAll} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                  {selectedDraftIds.size === drafts.filter(d => d.status !== 'done' && d.status !== 'uploading').length ? 'Deselect all' : 'Select all'}
                 </button>
               )}
             </div>
             <div className="flex items-center gap-2">
               {!pushingDrafts && pushableDraftCount > 0 && (
-                <button
-                  onClick={handlePushDrafts}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-medium rounded-lg transition-colors"
-                >
+                <button onClick={handlePushDrafts}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-medium rounded-lg transition-colors">
                   <Send size={12} /> Push {pushableDraftCount}
                 </button>
               )}
@@ -765,18 +649,16 @@ function ListingWorkspace({ listing, onBack }) {
 
           <div className="space-y-2">
             {drafts.map(draft => (
-              <div
-                key={draft.draftId}
-                onClick={() => draft.status !== 'done' && toggleDraftSelect(draft.draftId)}
+              <div key={draft.draftId}
+                onClick={() => draft.status !== 'done' && draft.status !== 'uploading' && toggleDraftSelect(draft.draftId)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 border cursor-pointer transition-colors ${
                   draft.status === 'done' ? 'bg-emerald-500/5 border-emerald-500/20 cursor-default'
-                  : draft.status === 'error' ? 'bg-red-500/5 border-red-500/20'
                   : draft.status === 'uploading' ? 'bg-blue-500/5 border-blue-500/20 cursor-default'
-                  : selectedDraftIds.has(draft.draftId)
-                    ? 'bg-amber-500/10 border-amber-400/40'
-                    : 'bg-[#111] border-white/5 hover:border-amber-400/20'
-                }`}
-              >
+                  : draft.status === 'error' ? 'bg-red-500/5 border-red-500/20'
+                  : editingDraftId === draft.draftId ? 'bg-amber-500/10 border-amber-400/60'
+                  : selectedDraftIds.has(draft.draftId) ? 'bg-amber-500/10 border-amber-400/40'
+                  : 'bg-[#111] border-white/5 hover:border-amber-400/20'
+                }`}>
                 {/* Checkbox */}
                 {draft.status !== 'done' && draft.status !== 'uploading' && (
                   <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
@@ -792,17 +674,20 @@ function ListingWorkspace({ listing, onBack }) {
                   <p className="text-xs font-mono text-amber-400">{draft.id}</p>
                   <p className="text-xs text-gray-400 truncate">{draft.productName}</p>
                   {draft.error && <p className="text-xs text-red-400 mt-0.5 truncate">{draft.error}</p>}
-                  {!draft.status && <p className="text-xs text-gray-600">{new Date(draft.savedAt).toLocaleTimeString()}</p>}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-xs text-gray-500">${draft.price}</span>
                   {draft.status === 'done' && <CheckCircle size={14} className="text-emerald-400" />}
                   {draft.status === 'uploading' && <Loader2 size={14} className="animate-spin text-blue-400" />}
+                  {draft.status !== 'uploading' && draft.status !== 'done' && (
+                    <button onClick={e => { e.stopPropagation(); handleEditDraft(draft) }}
+                      className="text-gray-500 hover:text-amber-400 transition-colors">
+                      <Pencil size={13} />
+                    </button>
+                  )}
                   {draft.status !== 'uploading' && (
-                    <button
-                      onClick={e => { e.stopPropagation(); removeDraft(draft.draftId) }}
-                      className="text-gray-600 hover:text-red-400 transition-colors"
-                    >
+                    <button onClick={e => { e.stopPropagation(); removeDraft(draft.draftId) }}
+                      className="text-gray-600 hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
                   )}

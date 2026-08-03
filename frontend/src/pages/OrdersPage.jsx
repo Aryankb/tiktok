@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import {
-  RefreshCw, Download, Loader2, Package, ChevronDown, ChevronRight, ShoppingCart,
+  RefreshCw, Download, Loader2, Package, ChevronDown, ChevronRight, ShoppingCart, TrendingUp,
 } from 'lucide-react'
 import { ordersApi } from '../api.js'
 
@@ -98,28 +98,138 @@ function OrderRow({ order }) {
   )
 }
 
+const STATUS_COLOR = {
+  AWAITING_SHIPMENT:   'text-blue-300',
+  AWAITING_COLLECTION: 'text-cyan-300',
+  IN_TRANSIT:          'text-purple-300',
+  DELIVERED:           'text-green-300',
+  COMPLETED:           'text-emerald-300',
+  CANCELLED:           'text-red-300',
+  UNPAID:              'text-yellow-300',
+  ON_HOLD:             'text-orange-300',
+}
+
+function ActivityFeed({ listingId }) {
+  const [items, setItems] = useState([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(null)
+  const [revenue, setRevenue] = useState(null)
+  const [currency, setCurrency] = useState('SGD')
+  const [loading, setLoading] = useState(false)
+  const scrollRef = useRef(null)
+
+  const loadPage = useCallback(async (p) => {
+    if (loading) return
+    setLoading(true)
+    try {
+      const data = await ordersApi.activity(listingId, p, 20)
+      setTotal(data.total)
+      setRevenue(data.total_revenue)
+      setCurrency(data.currency)
+      setItems(prev => p === 1 ? data.items : [...prev, ...data.items])
+      setPage(p)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [listingId, loading])
+
+  useEffect(() => { loadPage(1) }, [listingId])
+
+  function onScroll() {
+    const el = scrollRef.current
+    if (!el || loading) return
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+      if (total !== null && items.length < total) {
+        loadPage(page + 1)
+      }
+    }
+  }
+
+  return (
+    <div className="border-t border-white/8 mt-3 pt-3">
+      {revenue !== null && (
+        <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-400">
+          <TrendingUp size={13} className="text-emerald-400" />
+          <span>Total revenue:</span>
+          <span className="text-emerald-300 font-semibold">{currency} {revenue.toFixed(2)}</span>
+          {total !== null && <span className="ml-auto text-gray-600">{total} orders</span>}
+        </div>
+      )}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="max-h-52 overflow-y-auto space-y-1 pr-1"
+      >
+        {items.map((order, i) => (
+          <div key={order.order_id + i} className="flex items-start gap-2 text-xs py-1 border-b border-white/5 last:border-0">
+            <span className={`shrink-0 font-medium w-28 truncate ${STATUS_COLOR[order.status] ?? 'text-gray-400'}`}>
+              {order.status.replace(/_/g, ' ')}
+            </span>
+            <span className="shrink-0 text-gray-500 w-28">
+              {order.update_time
+                ? new Date(order.update_time * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : '—'}
+            </span>
+            <span className="text-gray-300 truncate flex-1">
+              {order.line_items.map(i => `${i.sku_name || i.seller_sku || '?'} ×${i.quantity}`).join(', ')}
+            </span>
+            {order.total_amount && (
+              <span className="shrink-0 text-white font-medium">{order.currency} {order.total_amount}</span>
+            )}
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-center py-2">
+            <Loader2 size={14} className="animate-spin text-gray-500" />
+          </div>
+        )}
+        {!loading && items.length === 0 && (
+          <p className="text-xs text-gray-600 py-2 text-center">No orders yet</p>
+        )}
+        {!loading && total !== null && items.length >= total && items.length > 0 && (
+          <p className="text-xs text-gray-600 py-1 text-center">All {total} orders loaded</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ListingCard({ listing, dateFrom, dateTo }) {
+  const [open, setOpen] = useState(false)
   const exportUrl = ordersApi.exportUrl(listing.listing_id, dateFrom, dateTo, listing.product_name)
 
   return (
-    <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/8 rounded-lg px-4 py-3">
-      <div className="flex-1 min-w-0 mr-4">
-        <p className="text-xs font-mono text-cyan-400">{listing.listing_id}</p>
-        {listing.product_name && (
-          <p className="text-sm text-white font-medium mt-0.5 truncate">{listing.product_name}</p>
-        )}
-        <p className="text-xs text-gray-400 mt-0.5">
-          {listing.latest_order_date && <span className="text-gray-500 mr-2">{listing.latest_order_date}</span>}
-          {listing.total_orders} orders · <span className="text-white font-medium">{listing.total_units} units</span>
-        </p>
+    <div className="bg-[#1a1a1a] border border-white/8 rounded-lg px-4 py-3">
+      <div className="flex items-center justify-between">
+        <button
+          className="flex-1 min-w-0 mr-4 text-left"
+          onClick={() => setOpen(v => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown size={13} className={`text-gray-500 transition-transform shrink-0 ${open ? '' : '-rotate-90'}`} />
+            <div className="min-w-0">
+              <p className="text-xs font-mono text-cyan-400">{listing.listing_id}</p>
+              {listing.product_name && (
+                <p className="text-sm text-white font-medium mt-0.5 truncate">{listing.product_name}</p>
+              )}
+              <p className="text-xs text-gray-400 mt-0.5">
+                {listing.latest_order_date && <span className="text-gray-500 mr-2">{listing.latest_order_date}</span>}
+                {listing.total_orders} orders · <span className="text-white font-medium">{listing.total_units} units</span>
+              </p>
+            </div>
+          </div>
+        </button>
+        <a
+          href={exportUrl}
+          download
+          className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+        >
+          <Download size={13} /> Export Excel
+        </a>
       </div>
-      <a
-        href={exportUrl}
-        download
-        className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
-      >
-        <Download size={13} /> Export Excel
-      </a>
+      {open && <ActivityFeed listingId={listing.listing_id} />}
     </div>
   )
 }
@@ -189,70 +299,14 @@ export default function OrdersPage() {
         <div className="flex items-center gap-2">
           <ShoppingCart size={18} className="text-pink-400" />
           <h1 className="text-lg font-semibold text-white">Orders</h1>
-          {!loading && (
-            <span className="text-xs text-gray-500">
-              {orders.length} orders · {totalQty} units
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 text-gray-400 hover:text-white transition-colors"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <button
-            onClick={handleSync}
-            disabled={syncing || !dateFrom || !dateTo}
-            className="flex items-center gap-1.5 text-sm px-4 py-1.5 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white rounded-lg transition-colors"
-          >
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Sync from TikTok
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">From</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="text-sm bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-white outline-none focus:border-pink-500"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">To</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="text-sm bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-white outline-none focus:border-pink-500"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500">Status</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="text-sm bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-white outline-none focus:border-pink-500"
-          >
-            <option value="">All statuses</option>
-            {['UNPAID','ON_HOLD','AWAITING_SHIPMENT','AWAITING_COLLECTION','IN_TRANSIT','DELIVERED','COMPLETED','CANCELLED'].map((s) => (
-              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
         </div>
         <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-sm px-4 py-1.5 bg-[#1a1a1a] border border-white/10 hover:border-pink-500/50 text-gray-300 hover:text-white rounded-lg transition-colors"
+          onClick={handleSync}
+          disabled={syncing || !dateFrom || !dateTo}
+          className="flex items-center gap-1.5 text-sm px-4 py-1.5 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white rounded-lg transition-colors"
         >
-          Apply filters
+          {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Sync from TikTok
         </button>
       </div>
 
@@ -312,6 +366,50 @@ export default function OrdersPage() {
 
       {/* Orders tab */}
       {!loading && tab === 'orders' && (
+        <div className="space-y-4">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-sm bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-white outline-none focus:border-pink-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-sm bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-white outline-none focus:border-pink-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="text-sm bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-white outline-none focus:border-pink-500"
+            >
+              <option value="">All statuses</option>
+              {['UNPAID','ON_HOLD','AWAITING_SHIPMENT','AWAITING_COLLECTION','IN_TRANSIT','DELIVERED','COMPLETED','CANCELLED'].map((s) => (
+                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-sm px-4 py-1.5 bg-[#1a1a1a] border border-white/10 hover:border-pink-500/50 text-gray-300 hover:text-white rounded-lg transition-colors"
+          >
+            {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            Apply filters
+          </button>
+          {!loading && <span className="text-xs text-gray-500 self-center">{orders.length} orders · {totalQty} units</span>}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -337,6 +435,7 @@ export default function OrdersPage() {
               )}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>
