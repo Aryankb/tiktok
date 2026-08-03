@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Mic, MicOff, Loader2, CheckCircle, XCircle, ChevronLeft,
-  Image as ImageIcon, Pencil, Plus, RefreshCw, Trash2, Send, BookmarkPlus,
+  Image as ImageIcon, Pencil, Plus, RefreshCw, Trash2, Send, BookmarkPlus, Images,
 } from 'lucide-react'
 import { API_HOST } from '../api.js'
 
@@ -210,6 +210,17 @@ function ListingWorkspace({ listing, onBack }) {
   const audioChunksRef = useRef([])
   const fileRef = useRef(null)
   const cameraRef = useRef(null)
+
+  // Bulk add state
+  const [bulkImages, setBulkImages] = useState([]) // [{file, preview}]
+  const [bulkName, setBulkName] = useState('')
+  const [bulkDims, setBulkDims] = useState({ length: '', width: '', height: '' })
+  const [bulkIncludeDims, setBulkIncludeDims] = useState(false)
+  const [bulkPrice, setBulkPrice] = useState('')
+  const [bulkStock, setBulkStock] = useState('')
+  const [bulkError, setBulkError] = useState(null)
+  const bulkFileRef = useRef(null)
+  const bulkCameraRef = useRef(null)
 
   const currentTitle = buildTitle(prefix, nextSeq, {
     length: dims.length || '?',
@@ -514,6 +525,63 @@ function ListingWorkspace({ listing, onBack }) {
     apiGet(`/skus/${listing.listing_id}`).then(data => setExistingSkus(data.skus || [])).catch(() => {})
   }
 
+  async function handleBulkImagesChange(e) {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    setBulkError(null)
+    const compressed = await Promise.all(files.map(f => compressToSquare(f)))
+    const entries = compressed.map(f => ({ file: f, preview: URL.createObjectURL(f) }))
+    setBulkImages(prev => [...prev, ...entries])
+    e.target.value = ''
+  }
+
+  function removeBulkImage(idx) {
+    setBulkImages(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  async function handleBulkSave() {
+    if (bulkImages.length === 0) { setBulkError('Add at least one image.'); return }
+    if (!bulkName) { setBulkError('Product name required.'); return }
+    if (!bulkPrice) { setBulkError('Price required.'); return }
+    if (!bulkStock) { setBulkError('Stock required.'); return }
+
+    // Compute starting seq from current state — drafts haven't changed yet
+    const { prefix: p, seq: startSeq } = computeNextSeq(existingSkus, drafts)
+
+    const newDrafts = await Promise.all(bulkImages.map(async ({ file, preview }, i) => {
+      const seq = startSeq + i
+      const title = buildTitle(p, seq, bulkDims, unit, bulkName, bulkIncludeDims)
+      const dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve(e.target.result)
+        reader.readAsDataURL(file)
+      })
+      return {
+        draftId: `${listing.listing_id}_${Date.now()}_${i}`,
+        id: `${p}${seq}`,
+        title,
+        imageDataUrl: dataUrl,
+        productName: bulkName,
+        dims: { ...bulkDims },
+        unit,
+        includeDims: bulkIncludeDims,
+        price: bulkPrice,
+        stock: bulkStock,
+        savedAt: new Date().toISOString(),
+      }
+    }))
+
+    setDrafts(d => [...d, ...newDrafts])
+    // Clear bulk form
+    setBulkImages([])
+    setBulkName('')
+    setBulkDims({ length: '', width: '', height: '' })
+    setBulkIncludeDims(false)
+    setBulkPrice('')
+    setBulkStock('')
+    setBulkError(null)
+  }
+
   const canSave = !!imagePreview && !!productName && !!price && !!stock
   const pushableDraftCount = drafts.filter(d => selectedDraftIds.has(d.draftId) && d.status !== 'done').length
   const isEditing = !!editingDraftId
@@ -679,6 +747,85 @@ function ListingWorkspace({ listing, onBack }) {
         <button onClick={handleSaveDraft} disabled={!canSave}
           className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-amber-400/30 hover:border-amber-400/60 disabled:opacity-40 text-amber-400 rounded-lg transition-colors text-sm">
           <BookmarkPlus size={15} /> {isEditing ? 'Update draft' : 'Save to drafts'}
+        </button>
+      </div>
+
+      {/* Bulk Add panel */}
+      <div className="bg-[#1a1a1a] border border-white/8 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Images size={14} className="text-pink-400" />
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Bulk Add — same details, multiple photos</p>
+        </div>
+
+        {/* Photo grid + add buttons */}
+        <div className="flex flex-wrap gap-2">
+          {bulkImages.map((img, idx) => {
+            const { prefix: bp, seq: bs } = computeNextSeq(existingSkus, drafts)
+            return (
+              <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 group">
+                <img src={img.preview} className="w-full h-full object-cover" alt="" />
+                <button
+                  onClick={() => removeBulkImage(idx)}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                  <Trash2 size={14} />
+                </button>
+                <span className="absolute bottom-0.5 right-1 text-white text-xs font-mono opacity-80 drop-shadow">
+                  {bp}{bs + idx}
+                </span>
+              </div>
+            )
+          })}
+          <div className="flex flex-col gap-1.5">
+            <button onClick={() => bulkFileRef.current?.click()}
+              className="w-20 h-9 rounded-lg border-2 border-dashed border-white/15 hover:border-pink-500/50 flex items-center justify-center gap-1 text-gray-600 hover:text-gray-400 transition-colors text-xs">
+              <ImageIcon size={13} /> Gallery
+            </button>
+            <button onClick={() => bulkCameraRef.current?.click()}
+              className="w-20 h-9 rounded-lg border-2 border-dashed border-white/15 hover:border-pink-500/50 flex items-center justify-center gap-1 text-gray-600 hover:text-gray-400 transition-colors text-xs">
+              📷 Camera
+            </button>
+          </div>
+        </div>
+        <input ref={bulkFileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleBulkImagesChange} />
+        <input ref={bulkCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleBulkImagesChange} />
+
+        {/* Shared fields */}
+        <FieldInput label="Product Name" value={bulkName} onChange={setBulkName} placeholder="e.g. Patterned Rug" />
+
+        <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+          <div onClick={() => setBulkIncludeDims(v => !v)}
+            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+              bulkIncludeDims ? 'bg-pink-500 border-pink-500' : 'border-white/20 bg-transparent'
+            }`}>
+            {bulkIncludeDims && <span className="text-white text-xs font-bold leading-none">✓</span>}
+          </div>
+          <span className="text-xs text-gray-400">Include dimensions in title</span>
+        </label>
+
+        {bulkIncludeDims && (
+          <div className="grid grid-cols-3 gap-3">
+            <FieldInput label="Length" value={bulkDims.length} onChange={v => setBulkDims(d => ({ ...d, length: v }))} placeholder="10" />
+            <FieldInput label="Width" value={bulkDims.width} onChange={v => setBulkDims(d => ({ ...d, width: v }))} placeholder="5" />
+            <FieldInput label="Height" value={bulkDims.height} onChange={v => setBulkDims(d => ({ ...d, height: v }))} placeholder="3" />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldInput label="Price (SGD)" value={bulkPrice} onChange={setBulkPrice} placeholder="12.90" />
+          <FieldInput label="Stock (qty)" value={bulkStock} onChange={setBulkStock} placeholder="50" type="number" />
+        </div>
+
+        {bulkError && (
+          <div className="flex items-center gap-2 text-xs text-red-400">
+            <XCircle size={13} /> {bulkError}
+          </div>
+        )}
+
+        <button
+          onClick={handleBulkSave}
+          disabled={bulkImages.length === 0 || !bulkName || !bulkPrice || !bulkStock}
+          className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#111] border border-pink-400/30 hover:border-pink-400/60 disabled:opacity-40 text-pink-400 rounded-lg transition-colors text-sm">
+          <BookmarkPlus size={15} /> Save {bulkImages.length > 0 ? bulkImages.length : ''} to drafts
         </button>
       </div>
 
