@@ -57,8 +57,12 @@ function parseId(str) {
 
 function draftsKey(listingId) { return `drafts_${listingId}` }
 function loadDrafts(listingId) {
-  try { return JSON.parse(localStorage.getItem(draftsKey(listingId)) || '[]') }
-  catch { return [] }
+  try {
+    const raw = JSON.parse(localStorage.getItem(draftsKey(listingId)) || '[]')
+    if (!Array.isArray(raw)) return []
+    // Drop any draft missing required fields — corrupted entries cause blank screen
+    return raw.filter(d => d && typeof d === 'object' && d.draftId && d.id)
+  } catch { return [] }
 }
 function saveDrafts(listingId, drafts) {
   localStorage.setItem(draftsKey(listingId), JSON.stringify(drafts))
@@ -418,8 +422,13 @@ function ListingWorkspace({ listing, onBack }) {
     if (toPush.length === 0) return
     setPushingDrafts(true)
 
-    for (const draft of toPush) {
-      setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'uploading', error: null } : x))
+    // Mark all selected as uploading
+    setDrafts(d => d.map(x => toPush.some(t => t.draftId === x.draftId)
+      ? { ...x, status: 'uploading', error: null, statusLabel: 'Uploading image…' }
+      : x))
+
+    // Step 1: upload all images in parallel
+    const uploadResults = await Promise.all(toPush.map(async (draft) => {
       try {
         const res = await fetch(draft.imageDataUrl)
         const blob = await res.blob()
@@ -427,25 +436,78 @@ function ListingWorkspace({ listing, onBack }) {
         const imgFd = new FormData()
         imgFd.append('image', file)
         const { uri } = await apiPost('/upload-image', imgFd)
-
-        const result = await apiPostJson('/add-sku', {
-          listing_id: listing.listing_id,
-          title: draft.title,
-          image_uri: uri,
-          price: draft.price,
-          stock: parseInt(draft.stock, 10),
-          seller_sku: draft.id,
-        })
-
-        if (result.success) {
-          setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'done' } : x))
-          setSelectedDraftIds(s => { const n = new Set(s); n.delete(draft.draftId); return n })
-        } else {
-          setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'error', error: result.error } : x))
-        }
+        return { draft, uri, error: null }
       } catch (e) {
-        setDrafts(d => d.map(x => x.draftId === draft.draftId ? { ...x, status: 'error', error: e.message } : x))
+        return { draft, uri: null, error: e.message }
       }
+    }))
+
+    // Mark image-upload failures immediately
+    const failed = uploadResults.filter(r => r.error)
+    const succeeded = uploadResults.filter(r => r.uri)
+    if (failed.length > 0) {
+      setDrafts(d => d.map(x => {
+        const f = failed.find(r => r.draft.draftId === x.draftId)
+        return f ? { ...x, status: 'error', statusLabel: null, error: `Image upload failed: ${f.error}` } : x
+      }))
+    }
+
+    if (succeeded.length === 0) {
+      setPushingDrafts(false)
+      return
+    }
+
+    // Step 2: single PUT with all successfully uploaded SKUs
+    setDrafts(d => d.map(x => succeeded.some(r => r.draft.draftId === x.draftId)
+      ? { ...x, statusLabel: 'Adding to TikTok…' }
+      : x))
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3 * 60 * 1000)
+    try {
+      const r = await fetch(LIVE_BASE + '/add-sku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...EXTRA_HEADERS },
+        body: JSON.stringify({
+          listing_id: listing.listing_id,
+          skus: succeeded.map(({ draft, uri }) => ({
+            title: draft.title,
+            image_uri: uri,
+            price: draft.price,
+            stock: parseInt(draft.stock, 10),
+            seller_sku: draft.id,
+          })),
+        }),
+        signal: controller.signal,
+      })
+      clearTimeout(timer)
+      const result = await r.json()
+      if (!r.ok) throw new Error(result.detail || r.statusText)
+
+      if (result.success) {
+        // All succeeded in the batch — mark all done
+        setDrafts(d => d.map(x => succeeded.some(r => r.draft.draftId === x.draftId)
+          ? { ...x, status: 'done', statusLabel: null }
+          : x))
+        setSelectedDraftIds(s => {
+          const n = new Set(s)
+          succeeded.forEach(r => n.delete(r.draft.draftId))
+          return n
+        })
+      } else {
+        // TikTok rejected the whole batch
+        setDrafts(d => d.map(x => succeeded.some(r => r.draft.draftId === x.draftId)
+          ? { ...x, status: 'error', statusLabel: null, error: result.error }
+          : x))
+      }
+    } catch (e) {
+      clearTimeout(timer)
+      const msg = e.name === 'AbortError'
+        ? 'Timed out — SKUs may still have been added. Reload listed SKUs to check.'
+        : e.message
+      setDrafts(d => d.map(x => succeeded.some(r => r.draft.draftId === x.draftId)
+        ? { ...x, status: 'error', statusLabel: null, error: msg }
+        : x))
     }
 
     setPushingDrafts(false)
@@ -673,6 +735,7 @@ function ListingWorkspace({ listing, onBack }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-mono text-amber-400">{draft.id}</p>
                   <p className="text-xs text-gray-400 truncate">{draft.productName}</p>
+                  {draft.statusLabel && <p className="text-xs text-blue-400 mt-0.5">{draft.statusLabel}</p>}
                   {draft.error && <p className="text-xs text-red-400 mt-0.5 truncate">{draft.error}</p>}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
