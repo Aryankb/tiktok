@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     tiktok_shop_cipher: str = ""
     tiktok_api_base_url: str = "https://open-api.tiktokglobalshop.com"
 
+    tiktok_listing_ids: str = ""   # comma-separated product IDs used as live listing slots
+
     data_dir: str = "./data"
     uploads_dir: str = "./uploads"
     images_dir: str = "./data/images"   # extracted product images served statically

@@ -5,6 +5,8 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.api.products import router as products_router
 from app.api.categories import router as categories_router
+from app.api.orders import router as orders_router
+from app.api.live_listing import router as live_listing_router
 
 app = FastAPI(
     title="TikTok Live Commerce Admin",
@@ -29,6 +31,8 @@ async def startup():
 
 app.include_router(products_router)
 app.include_router(categories_router)
+app.include_router(orders_router)
+app.include_router(live_listing_router)
 
 
 @app.get("/health")

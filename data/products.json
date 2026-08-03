@@ -1,20 +1,20 @@
 {
-  "07a38acf-9f39-4f27-aae3-24e4d416aaf8": {
-    "product_source_id": "07a38acf-9f39-4f27-aae3-24e4d416aaf8",
-    "created_at": "2026-07-28T11:49:44.654017",
-    "updated_at": "2026-07-28T11:49:44.654441",
-    "source_file": "A1.jpg",
+  "83e9f8d8-0f1c-46b6-8b6a-68f1bbbdd827": {
+    "product_source_id": "83e9f8d8-0f1c-46b6-8b6a-68f1bbbdd827",
+    "created_at": "2026-07-28T12:45:37.504414",
+    "updated_at": "2026-07-28T12:45:37.504414",
+    "source_file": "17852426922266607106699804156236.jpg",
     "source_page": 0,
     "upload_type": "single",
-    "source_city": "jodhpur",
-    "factory_name": "mogra",
+    "source_city": "Jodhpur",
+    "factory_name": "A",
     "tiktok_listing_id": null,
-    "cost_price": "20",
-    "selling_price": "93.60",
+    "cost_price": "888",
+    "selling_price": "4155.84",
     "sku_code": null,
     "extracted_text": "",
     "additional_text": null,
-    "image_path": "data\\images\\A1.jpg_page0.jpg",
+    "image_path": "data\\images\\17852426922266607106699804156236.jpg_page0.jpg",
     "tiktok_payload": {
       "title": "",
       "description": "",
@@ -24,9 +24,9 @@
       "skus": [],
       "package_weight": null,
       "package_dimensions": {
-        "length": "70",
-        "width": "30",
-        "height": "40",
+        "length": "97",
+        "width": "155",
+        "height": "1",
         "unit": "CENTIMETER"
       }
     },
@@ -34,22 +34,22 @@
     "tiktok_product_id": null,
     "push_error": null
   },
-  "715f305f-cb49-4ed3-84b3-50d99623e655": {
-    "product_source_id": "715f305f-cb49-4ed3-84b3-50d99623e655",
-    "created_at": "2026-07-28T11:49:44.656142",
-    "updated_at": "2026-07-28T11:49:44.656142",
-    "source_file": "linkedin_aryan.png",
+  "2d9f07f3-092d-4749-8f00-d21186f963d6": {
+    "product_source_id": "2d9f07f3-092d-4749-8f00-d21186f963d6",
+    "created_at": "2026-07-28T12:50:30.091244",
+    "updated_at": "2026-07-28T12:50:30.091244",
+    "source_file": "17852429850285715728391799778912.jpg",
     "source_page": 0,
     "upload_type": "single",
-    "source_city": "jodhpur",
-    "factory_name": "mogra",
+    "source_city": null,
+    "factory_name": null,
     "tiktok_listing_id": null,
-    "cost_price": "20",
-    "selling_price": "93.60",
+    "cost_price": null,
+    "selling_price": null,
     "sku_code": null,
     "extracted_text": "",
     "additional_text": null,
-    "image_path": "data\\images\\linkedin_aryan.png_page0.jpg",
+    "image_path": "data\\images\\17852429850285715728391799778912.jpg_page0.jpg",
     "tiktok_payload": {
       "title": "",
       "description": "",
@@ -59,9 +59,9 @@
       "skus": [],
       "package_weight": null,
       "package_dimensions": {
-        "length": "70",
-        "width": "30",
-        "height": "40",
+        "length": "60",
+        "width": "123",
+        "height": "1",
         "unit": "CENTIMETER"
       }
     },
@@ -69,99 +69,34 @@
     "tiktok_product_id": null,
     "push_error": null
   },
-  "f504a9af-677d-4355-b3ae-7b9fb56ec0a1": {
-    "product_source_id": "f504a9af-677d-4355-b3ae-7b9fb56ec0a1",
-    "created_at": "2026-07-28T11:52:53.353023",
-    "updated_at": "2026-07-28T11:52:53.353023",
-    "source_file": "linkedin_aryan.png",
+  "c175e698-4f67-44a9-bdb6-f06ab4da2644": {
+    "product_source_id": "c175e698-4f67-44a9-bdb6-f06ab4da2644",
+    "created_at": "2026-07-28T12:52:27.137224",
+    "updated_at": "2026-07-28T12:52:27.137224",
+    "source_file": "17852431297225513749051661131982.jpg",
     "source_page": 0,
     "upload_type": "single",
-    "source_city": "jodhpur",
-    "factory_name": "mogra",
+    "source_city": null,
+    "factory_name": null,
     "tiktok_listing_id": null,
-    "cost_price": "20",
-    "selling_price": "93.60",
+    "cost_price": null,
+    "selling_price": null,
     "sku_code": null,
     "extracted_text": "",
     "additional_text": null,
-    "image_path": "data\\images\\linkedin_aryan.png_page0.jpg",
+    "image_path": "data\\images\\17852431297225513749051661131982.jpg_page0.jpg",
     "tiktok_payload": {
-      "title": "Professional Business Portrait Photography Service",
-      "description": "<p>Elevate your personal brand with high-quality professional portraits. Perfect for LinkedIn profiles, corporate websites, and professional portfolios. Our photography sessions capture your best look in a sophisticated urban setting.</p><p>Features:</p><ul><li>High-resolution digital files</li><li>Professional lighting and composition</li><li>Perfect for business and networking</li></ul>",
+      "title": "",
+      "description": "",
       "category_id": "",
       "brand_id": null,
       "images": [],
-      "skus": [
-        {
-          "seller_sku": null,
-          "original_price": {
-            "amount": "93.60",
-            "currency": "USD"
-          },
-          "stock_infos": [
-            {
-              "warehouse_id": "",
-              "available_stock": 0
-            }
-          ],
-          "sales_attributes": []
-        }
-      ],
+      "skus": [],
       "package_weight": null,
       "package_dimensions": {
-        "length": "5",
-        "width": "5",
-        "height": "5",
-        "unit": "CENTIMETER"
-      }
-    },
-    "push_status": "pending",
-    "tiktok_product_id": null,
-    "push_error": null
-  },
-  "25711d25-df81-42c3-9d4c-296a0918ee4e": {
-    "product_source_id": "25711d25-df81-42c3-9d4c-296a0918ee4e",
-    "created_at": "2026-07-28T11:53:02.687741",
-    "updated_at": "2026-07-28T11:53:02.687741",
-    "source_file": "A1.jpg",
-    "source_page": 0,
-    "upload_type": "single",
-    "source_city": "jodhpur",
-    "factory_name": "mogra",
-    "tiktok_listing_id": null,
-    "cost_price": "20",
-    "selling_price": "93.60",
-    "sku_code": null,
-    "extracted_text": "",
-    "additional_text": null,
-    "image_path": "data\\images\\A1.jpg_page0.jpg",
-    "tiktok_payload": {
-      "title": "Bohemian Patchwork Kantha Storage Bench",
-      "description": "<p>Add a touch of global charm to your home with this stunning handcrafted patchwork storage bench. Featuring vibrant, traditional Kantha fabric designs, this functional piece offers both style and extra storage space for your living room or bedroom. Perfect for a boho-chic interior.</p>",
-      "category_id": "",
-      "brand_id": null,
-      "images": [],
-      "skus": [
-        {
-          "seller_sku": null,
-          "original_price": {
-            "amount": "93.60",
-            "currency": "USD"
-          },
-          "stock_infos": [
-            {
-              "warehouse_id": "",
-              "available_stock": 0
-            }
-          ],
-          "sales_attributes": []
-        }
-      ],
-      "package_weight": null,
-      "package_dimensions": {
-        "length": "5",
-        "width": "5",
-        "height": "5",
+        "length": "60",
+        "width": "92",
+        "height": "1",
         "unit": "CENTIMETER"
       }
     },
