@@ -628,7 +628,19 @@ function ListingWorkspace({ listing, onBack }) {
         {!loadingSkus && existingSkus.length === 0 && !skusError && <p className="text-xs text-gray-600">No variations listed yet.</p>}
         {existingSkus.length > 0 && (
           <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-            {existingSkus.map(s => (
+            {[...existingSkus].sort((a, b) => {
+              // Parse "AUS4.1", "A1", "DD5" → { prefix: "AUS", num: 4.1 }
+              const parse = s => {
+                const m = (s.title || s.seller_sku || '').match(/^([A-Za-z]+)([\d.]+)/)
+                return m ? { prefix: m[1].toUpperCase(), num: parseFloat(m[2]) } : null
+              }
+              const pa = parse(a), pb = parse(b)
+              if (!pa && !pb) return (a.title || '').localeCompare(b.title || '')
+              if (!pa) return 1
+              if (!pb) return -1
+              if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix)
+              return pa.num - pb.num
+            }).map(s => (
               <div key={s.sku_id} className="flex items-center gap-2 bg-[#111] rounded-lg px-3 py-2">
                 {s.image_url ? <img src={s.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                   : <div className="w-8 h-8 rounded bg-white/5 flex-shrink-0" />}

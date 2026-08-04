@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from app.models.order import OrderRecord, OrderSyncResult
 from app.services import orders_db, orders_service
-from app.services.excel_export import generate_factory_excel
+from app.services.excel_export import generate_factory_excel, generate_combined_excel
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -273,6 +273,44 @@ async def export_excel(
     else:
         safe_name = listing_id[-8:]
     filename = f"{safe_name}.xlsx"
+
+    return StreamingResponse(
+        iter([excel_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+class MultiExportRequest(BaseModel):
+    listing_ids: list[str]
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+
+
+@router.post("/export-multi")
+async def export_excel_multi(body: MultiExportRequest):
+    """Export a combined Excel for multiple listing IDs (e.g. two factories combined)."""
+    if not body.listing_ids:
+        raise HTTPException(400, "At least one listing_id required")
+
+    orders = await orders_db.list_orders()
+
+    if body.date_from:
+        ts = _date_to_ts(body.date_from)
+        orders = [o for o in orders if o.create_time >= ts]
+    if body.date_to:
+        ts = _date_to_ts(body.date_to, end_of_day=True)
+        orders = [o for o in orders if o.create_time <= ts]
+
+    loop = asyncio.get_event_loop()
+    excel_bytes = await loop.run_in_executor(
+        None,
+        partial(generate_combined_excel, orders, body.listing_ids),
+    )
+
+    import re
+    safe = re.sub(r'[\\/:*?"<>|]', '', "+".join(lid[-6:] for lid in body.listing_ids))
+    filename = f"combined_{safe}.xlsx"
 
     return StreamingResponse(
         iter([excel_bytes]),

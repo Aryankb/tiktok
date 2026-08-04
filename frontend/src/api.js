@@ -125,6 +125,11 @@ export const ordersApi = {
   activity: (listingId, page = 1, pageSize = 20) =>
     ordersRequest(`/activity/${encodeURIComponent(listingId)}?page=${page}&page_size=${pageSize}`),
 
+  exportMulti: (listingIds, dateFrom, dateTo) =>
+    `${ORDERS_BASE}/export-multi`,  // POST — called manually with fetch
+
+  exportMultiUrl: () => `${ORDERS_BASE}/export-multi`,
+
   exportUrl: (listingId, dateFrom, dateTo, productName) => {
     const qs = new URLSearchParams()
     if (dateFrom) qs.set('date_from', dateFrom)

@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import {
-  RefreshCw, Download, Loader2, Package, ChevronDown, ChevronRight, ShoppingCart, TrendingUp,
+  RefreshCw, Download, Loader2, Package, ChevronDown, ChevronRight, ShoppingCart, TrendingUp, FileDown,
 } from 'lucide-react'
-import { ordersApi } from '../api.js'
+import { ordersApi, API_HOST } from '../api.js'
+
+const EXTRA_HEADERS = API_HOST.includes('ngrok') ? { 'ngrok-skip-browser-warning': '1' } : {}
 
 const today = () => new Date().toISOString().slice(0, 10)
 const monthAgo = () => {
@@ -196,15 +198,25 @@ function ActivityFeed({ listingId }) {
   )
 }
 
-function ListingCard({ listing, dateFrom, dateTo }) {
+function ListingCard({ listing, dateFrom, dateTo, selected, onToggleSelect }) {
   const [open, setOpen] = useState(false)
   const exportUrl = ordersApi.exportUrl(listing.listing_id, dateFrom, dateTo, listing.product_name)
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/8 rounded-lg px-4 py-3">
-      <div className="flex items-center justify-between">
+    <div className={`bg-[#1a1a1a] border rounded-lg px-4 py-3 transition-colors ${selected ? 'border-emerald-500/50' : 'border-white/8'}`}>
+      <div className="flex items-center justify-between gap-2">
+        {/* Checkbox */}
         <button
-          className="flex-1 min-w-0 mr-4 text-left"
+          onClick={() => onToggleSelect(listing.listing_id)}
+          className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+            selected ? 'bg-emerald-500 border-emerald-500' : 'border-white/20 hover:border-emerald-500/50'
+          }`}
+        >
+          {selected && <span className="text-white text-xs font-bold leading-none">✓</span>}
+        </button>
+
+        <button
+          className="flex-1 min-w-0 mr-2 text-left"
           onClick={() => setOpen(v => !v)}
         >
           <div className="flex items-center gap-2">
@@ -226,7 +238,7 @@ function ListingCard({ listing, dateFrom, dateTo }) {
           download
           className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
         >
-          <Download size={13} /> Export Excel
+          <Download size={13} /> Export
         </a>
       </div>
       {open && <ActivityFeed listingId={listing.listing_id} />}
@@ -247,6 +259,8 @@ export default function OrdersPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterListing, setFilterListing] = useState('')
   const [tab, setTab] = useState('listings') // 'listings' | 'orders'
+  const [selectedListings, setSelectedListings] = useState(new Set())
+  const [exportingMulti, setExportingMulti] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -284,6 +298,38 @@ export default function OrdersPage() {
       setError(e.message)
     } finally {
       setSyncing(false)
+    }
+  }
+
+  function toggleListingSelect(id) {
+    setSelectedListings(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function handleExportMulti() {
+    if (selectedListings.size === 0) return
+    setExportingMulti(true)
+    try {
+      const res = await fetch(ordersApi.exportMultiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...EXTRA_HEADERS },
+        body: JSON.stringify({
+          listing_ids: [...selectedListings],
+          date_from: dateFrom || undefined,
+          date_to: dateTo || undefined,
+        }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `combined_export.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setExportingMulti(false)
     }
   }
 
@@ -352,13 +398,41 @@ export default function OrdersPage() {
       {/* Listings tab */}
       {!loading && tab === 'listings' && (
         <div className="space-y-2">
+          {selectedListings.size > 0 && (
+            <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2">
+              <span className="text-sm text-emerald-300">{selectedListings.size} listing{selectedListings.size !== 1 ? 's' : ''} selected</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedListings(new Set())}
+                  className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded transition-colors"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleExportMulti}
+                  disabled={exportingMulti}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {exportingMulti ? <Loader2 size={12} className="animate-spin" /> : <FileDown size={12} />}
+                  Export {selectedListings.size} combined
+                </button>
+              </div>
+            </div>
+          )}
           {listings.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-10">
               No listings found. Sync orders first.
             </p>
           ) : (
             listings.map((l) => (
-              <ListingCard key={l.listing_id} listing={l} dateFrom={dateFrom} dateTo={dateTo} />
+              <ListingCard
+                key={l.listing_id}
+                listing={l}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                selected={selectedListings.has(l.listing_id)}
+                onToggleSelect={toggleListingSelect}
+              />
             ))
           )}
         </div>
